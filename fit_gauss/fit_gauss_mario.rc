@@ -1,0 +1,278 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 235, 55
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "About fit_gauss_mario"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,11,17,20,20
+    LTEXT           "fit_gauss_mario Version 1.0",IDC_STATIC,40,10,119,8,
+                    SS_NOPREFIX
+    LTEXT           "Copyright (C) 2014",IDC_STATIC,40,25,119,8
+    DEFPUSHBUTTON   "OK",IDOK,178,7,50,16,WS_GROUP
+END
+
+IDD_FIT_GAUSS_MARIO_DIALOG DIALOGEX 0, 0, 801, 503
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | 
+    WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "fit_gauss_mario"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,744,7,50,16
+    PUSHBUTTON      "Cancel",IDCANCEL,744,25,50,16
+    EDITTEXT        IDC_EDIT1,7,7,95,12,ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Open Exp. Data",IDC_BUTTON_OPEN_EXP,113,7,77,12
+    EDITTEXT        IDC_EDIT2,7,23,95,12,ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Open MCNP  Data",IDC_BUTTON_OPEN_MCNP,113,24,77,12
+    GROUPBOX        "Static",IDC_STATIC_PLOT,7,108,780,326
+    LTEXT           "Static",IDC_STATIC_COORD,199,7,138,11
+    LTEXT           "X_min",IDC_STATIC,203,16,20,13
+    EDITTEXT        IDC_EDIT3,226,16,45,13,ES_AUTOHSCROLL
+    LTEXT           "X_max",IDC_STATIC,274,16,20,13
+    EDITTEXT        IDC_EDIT4,297,16,45,13,ES_AUTOHSCROLL
+    LTEXT           "Y_min",IDC_STATIC,203,30,20,13
+    EDITTEXT        IDC_EDIT5,226,30,45,13,ES_AUTOHSCROLL
+    LTEXT           "Y_max",IDC_STATIC,275,30,23,13
+    EDITTEXT        IDC_EDIT6,300,30,45,13,ES_AUTOHSCROLL
+    PUSHBUTTON      "REPLOT",IDC_BUTTON_REPLOT,353,17,48,14
+    GROUPBOX        "Fit Block",IDC_STATIC,431,7,299,103
+    PUSHBUTTON      "GO",IDC_BUTTON_GO,686,14,43,15
+    LTEXT           "a",IDC_STATIC,449,16,11,12
+    LTEXT           "x0",IDC_STATIC,449,28,8,12
+    LTEXT           "s",IDC_STATIC,449,40,8,12
+    EDITTEXT        IDC_EDIT7,463,13,63,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT8,463,25,63,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT9,463,37,63,12,ES_AUTOHSCROLL
+    LISTBOX         IDC_LIST1,55,438,514,50,LBS_NOINTEGRALHEIGHT | 
+                    WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Show Gauss",IDC_BUTTON_SHOW_GAUSS,683,50,45,15
+    LTEXT           "Static",IDC_STATIC_VARIANZA,226,48,48,12,SS_CENTERIMAGE
+    CONTROL         "Check1",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,532,14,10,10
+    CONTROL         "Check1",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,532,26,10,10
+    CONTROL         "Check1",IDC_CHECK3,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,532,39,10,10
+    LTEXT           "BKG m",IDC_STATIC,435,52,22,12
+    EDITTEXT        IDC_EDIT10,463,49,63,12,ES_AUTOHSCROLL
+    CONTROL         "Check1",IDC_CHECK4,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,532,51,10,10
+    PUSHBUTTON      "Save Fit",IDC_BUTTON_SAVE,113,41,77,12
+    LTEXT           "Static",IDC_STATIC_VARIANZA2,295,48,122,12,
+                    SS_CENTERIMAGE
+    CONTROL         "Convolution instead than multiplied",IDC_CHECK5,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,219,85,128,13
+    PUSHBUTTON      "Zoom All",IDC_BUTTON_ZOOM_ALL,17,41,77,12
+    LTEXT           "BKG c",IDC_STATIC,434,66,22,12
+    EDITTEXT        IDC_EDIT11,462,63,63,12,ES_AUTOHSCROLL
+    CONTROL         "Check1",IDC_CHECK6,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,532,65,10,10
+    LTEXT           "BKG_tot= ",IDC_STATIC,434,79,30,10
+    EDITTEXT        IDC_EDIT12,472,79,50,11,ES_AUTOHSCROLL
+    PUSHBUTTON      "ABORT",IDC_BUTTON_ABORT,686,33,43,11
+    LTEXT           "Step=",IDC_STATIC,224,68,25,10
+    LTEXT           "Static",IDC_STATIC_STEP,257,68,64,9
+    LTEXT           "Integrale",IDC_STATIC,434,94,30,10
+    EDITTEXT        IDC_EDIT13,472,94,50,11,ES_AUTOHSCROLL
+    PUSHBUTTON      "SAVE DATA",IDC_BUTTON_SAVE_DATA,671,83,59,14
+    EDITTEXT        IDC_EDIT14,548,12,53,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT15,548,27,53,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT16,548,39,53,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT17,548,51,53,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT18,548,63,53,12,ES_AUTOHSCROLL | ES_READONLY
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "CompanyName", "TODO: <Company name>"
+            VALUE "FileDescription", "TODO: <File description>"
+            VALUE "FileVersion", "1.0.0.1"
+            VALUE "InternalName", "fit_gauss_mario.exe"
+            VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
+            VALUE "OriginalFilename", "fit_gauss_mario.exe"
+            VALUE "ProductName", "TODO: <Product name>"
+            VALUE "ProductVersion", "1.0.0.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 228
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 48
+    END
+
+    IDD_FIT_GAUSS_MARIO_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 794
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 496
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// RT_MANIFEST
+//
+
+IDR_MANIFEST            RT_MANIFEST             "res\\fit_gauss_mario.manifest"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_ABOUTBOX            "&About fit_gauss_mario..."
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Italian (Italy) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ITA)
+#ifdef _WIN32
+LANGUAGE LANG_ITALIAN, SUBLANG_ITALIAN
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
+    "LANGUAGE 9, 1\r\n"
+    "#pragma code_page(1252)\r\n"
+    "#include ""res\\fit_gauss_mario.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""afxres.rc""         // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\fit_gauss_mario.ico"
+#endif    // Italian (Italy) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE 9, 1
+#pragma code_page(1252)
+#include "res\fit_gauss_mario.rc2"  // non-Microsoft Visual C++ edited resources
+#include "afxres.rc"         // Standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
