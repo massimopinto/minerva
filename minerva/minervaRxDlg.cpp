@@ -2465,6 +2465,9 @@ void CminervaRxDlg::OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult) // Adjusts 
 	{
 		m_scale_plot_thermo *= 10;
 	}
+	CString tmp;
+	tmp.Format(_T("m_scale_plot_thermo = %.5f"), m_scale_plot_thermo);
+	MessageBox(tmp);
 	if (m_points_vector_thermo>2)
 	{
 		double x_min = m_grafico_termo->m_xmin;
@@ -2569,55 +2572,97 @@ int CminervaRxDlg::create_core_graph()
 
 
 void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
+	// Aggiornato con le impostazioni che abbiamo usato per il calorimetro del Cobalto 60 in Maggio 2017  
 {
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// Adjusts the y-axis scale on the core plot
 	int old_scale = m_scale_plot_core;
-	if (pNMUpDown->iDelta == 1 && m_scale_plot_core> 0.01)
+	if (pNMUpDown->iDelta == 1 /*&& m_scale_plot_core> 0.01*/) // tasto GIU'
 	{
-		m_scale_plot_core /= 10;
+		m_scale_plot_core /= 10.0;
 	}
-	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core<100)
+	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core <= 0.1) // tasto SU
 	{
-		m_scale_plot_core *= 10;
+		m_scale_plot_core *= 10.0;
 	}
-	if (m_points_vector_core>2)
-	{
-		double x_min = m_grafico_core->m_xmin;
-		double x_max = m_grafico_core->m_xmax;
 
-		double delta = m_vector_core[m_points_vector_core - 1][1];
-		int delta_int = 0;
-		(delta>0) ? delta_int = (delta*m_scale_plot_core + .5) : delta_int = (delta*m_scale_plot_core - .5);
-		double y_min = ((delta_int - 1) / double(m_scale_plot_core));
-		double y_max = ((delta_int + 1) / double(m_scale_plot_core));
 
-		m_grafico_core->coordinate(x_min, x_max, y_min, y_max);
-		m_grafico_core->x_tick_change(600);
-		m_grafico_core->y_tick_change((2. / m_scale_plot_core) / 5.);
-		m_grafico_core->plotta_frame();
-		if (m_grafico_core->punto_plottabile(x_min, 0) && m_grafico_core->punto_plottabile(x_max, 0))
+	//CString tmp;
+	//tmp.Format(_T("m_scale_plot_core = %.5f"), m_scale_plot_core);
+	//MessageBox(tmp);
+	double resistance = m_vector_core[m_points_vector_core - 1][1];
+	double time = m_vector_core[m_points_vector_core - 1][0];
+
+	double y_min;
+	double y_max;
+
+	if (m_points_vector_core > 2)
 		{
-			m_grafico_core->CambiaColore(0, 100, 0, 1);
-			m_grafico_core->plot_single_point(x_min, 0, TRUE);
-			m_grafico_core->plot_single_point(x_max, 0, FALSE);
-			m_grafico_core->CambiaColore(0, 0, 200, 2);
+			//if ((resistance*1.2*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
+		if ((resistance*0.5*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
+				{
+					y_min = m_grafico_core->m_ymin;
+					y_max = m_grafico_core->m_ymax;
+				}
+			else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a pi� o meno il 20% del valore di R)
+				{    // purtoppo quanto cade fuori da questa fascia non sar� pi� visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
+					y_min = resistance*1.2*m_scale_plot_core;
+					y_max = resistance*0.8*m_scale_plot_core;
+				}
+
+			m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
+			m_grafico_core->x_tick_change(600);
+			//m_grafico_core->y_tick_change((2. / scala) / 5.);
+			m_grafico_core->y_tick_change((y_max - y_min) / 5.); // nuova larghezza dell'unit� sulle ordinate del grafico
+			m_grafico_core->plotta_frame();
 		}
-		m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1);
+
+	//if (m_points_vector_core>2)
+	//{
+		//double x_min = m_grafico_core->m_xmin;
+		//double x_max = m_grafico_core->m_xmax;
+
+		//double delta = m_vector_core[m_points_vector_core - 1][1];
+		//int delta_int = 0;
+		//(delta>0) ? delta_int = (delta*m_scale_plot_core + .5) : delta_int = (delta*m_scale_plot_core - .5);
+		//double y_min = ((delta_int - 1) / double(m_scale_plot_core));
+		//double y_max = ((delta_int + 1) / double(m_scale_plot_core));
+
+		//m_grafico_core->coordinate(x_min, x_max, y_min, y_max);
+		//m_grafico_core->x_tick_change(600);
+		//m_grafico_core->y_tick_change((2. / m_scale_plot_core) / 5.);
+		//m_grafico_core->plotta_frame();
+
+	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
+	{
+		m_grafico_core->CambiaColore(0, 100, 200, 1);
+		m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
+		m_grafico_core->plot_single_point(time + 10, 0, FALSE);
+		m_grafico_core->CambiaColore(0, 100, 0, 2);
 	}
+
+	m_grafico_core->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1);
+	//if (m_grafico_core->punto_plottabile(x_min, 0) && m_grafico_core->punto_plottabile(x_max, 0))
+	//	{
+	//		m_grafico_core->CambiaColore(0, 100, 0, 1);
+	//		m_grafico_core->plot_single_point(x_min, 0, TRUE);
+	//		m_grafico_core->plot_single_point(x_max, 0, FALSE);
+	//		m_grafico_core->CambiaColore(0, 0, 200, 2);
+	//	}
+	//}
 
 	*pResult = 0;
 }
 
 
-int CminervaRxDlg::plot_core(double time, double resistance)
+int CminervaRxDlg::plot_core(double time, double R)
 {
-	double ymin = resistance;
-	double ymax = resistance;
+	/*double ymin = R;
+	double ymax = R; */
 	if (m_points_vector_core<DIM_VET_CORE)
 	{
 		m_vector_core[m_points_vector_core][0] = time;
-		m_vector_core[m_points_vector_core][1] = resistance;
+		m_vector_core[m_points_vector_core][1] = R;
 		m_points_vector_core++;
 
 	}
@@ -2631,12 +2676,29 @@ int CminervaRxDlg::plot_core(double time, double resistance)
 			ctr++;
 		}
 		m_vector_core[ctr][0] = time;
-		m_vector_core[ctr][1] = resistance;
+		m_vector_core[ctr][1] = R;
 	}
 
-	int scala = m_scale_plot_core;
+	// portion commented, as tested on Calorimetro Co60 in May 2017
+	// Questo era il vecchio modo di graficare i dati di deltaT, centrati intorno allo zero.
+	/* int scala = m_scale_plot_core;
 	int delta;
-	(resistance>0) ? delta = (resistance*scala + .5) : delta = (resistance*scala - .5);
+	(resistance>0) ? delta = (resistance*scala + .5) : delta = (resistance*scala - .5); */
+
+	double y_min;
+	double y_max;
+
+		// The current R values is plottable on the canvas given the current m_scale_plot_core value.
+		{
+			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
+			y_max = m_grafico_core->m_ymax;
+		}
+		else
+		{
+		}
+
+
+	/* 
 	double y_min = ((delta - 1) / double(scala));
 	double y_max = ((delta + 1) / double(scala));
 	if (resistance<m_grafico_core->m_ymax && resistance>m_grafico_core->m_ymin)
@@ -2645,9 +2707,10 @@ int CminervaRxDlg::plot_core(double time, double resistance)
 		y_max = m_grafico_core->m_ymax;
 
 	}
+	*/
 	m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
 	m_grafico_core->x_tick_change(600);
-	m_grafico_core->y_tick_change((2. / scala) / 5.);
+	/* m_grafico_core->y_tick_change((2. / scala) / 5.); */
 	m_grafico_core->plotta_frame();
 	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
 	{
