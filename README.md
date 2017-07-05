@@ -17,6 +17,7 @@ The hardware that this software is piloting consists, other than the actual calo
 The actual number of instruments connected together via a GPIB network depends on the number of graphite bodies in the calorimeter and the number Wheatstone bridges available. 
 
 The Current developers of these sets of codes are [Massimo Pinto](http://massimopinto.github.io), Gianluca Cappadozzi, and Marco D'Arienzo, all of ENEA-INMRI. 
+The *grafico_ver2* class and the *regressione* class and methods were developed by Stefano Loreti.
 
 ## References 
 1.	Guerra AS, Loreti S, Pimpinella M, Quini M, D'Arienzo M, Astefanoaei I, et al. A standard graphite calorimeter for dosimetry in brachytherapy with high dose rate 192Ir sources. Metrologia. IOP Publishing; 2012 Aug 10;49(5):S179–83. [doi:10.1088/0026-1394/49/5/S179](dx.doi.org/10.1088/0026-1394/49/5/S17)
