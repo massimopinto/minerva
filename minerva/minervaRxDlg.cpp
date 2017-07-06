@@ -523,9 +523,7 @@ BOOL CminervaRxDlg::inizializza_GPIB()
 	IBSTA();
 	if (ibsta & ERR)
 	{
-		
 		testo = " No Devices connected!!  ";
-
 		AfxMessageBox(testo);
 		return FALSE;
 	}
@@ -676,7 +674,6 @@ int CminervaRxDlg::check_instruments()
 		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
 	}
 	;
-
 	return 0;
 }
 
@@ -685,10 +682,8 @@ BOOL CminervaRxDlg::write_GPIB(int address, CString command)
 {
 	CString text;
 	 
-	 
 	 int length = conv_CS_CH(command);
 	 m_string[length] = '\r';
-	
 
 	int result = ibwrt(address, m_string, length+1);
 	IBSTA();
@@ -814,7 +809,8 @@ void CminervaRxDlg::OnDestroy()
 	k_2400_onoff(0, m_adr_k2400);
 	k_2400_onoff(0, m_adr_k2400_core);
 	k_2400_onoff(0, m_adr_k2400_jacket);
-	k_2400_onoff(0, m_adr_k6220_core);
+	K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr, FALSE); // Halts Trigger and exits from DeltaMode.
+	// k_2400_onoff(0, m_adr_k6220_core);
 	k_2400_onoff(0, m_adr_k6220_multi);
 
 	delete[] m_string;
@@ -992,6 +988,9 @@ void CminervaRxDlg::K6220_configuration(int address)
 	write_GPIB(address, text);
 
 	/* settaggi 2182 attraverso seriale (delta mode)*/
+
+	//text = L"SYST:COMM:SER:SEND '*rst'"; /*Resets the 2182A to defaults */
+	//write_GPIB(address, text);
 
 	text = L"SYST:COMM:SER:SEND 'VOLT:RANG 0.01'";
 	write_GPIB(address, text);
@@ -1489,19 +1488,32 @@ void CminervaRxDlg::OnBnClickedButtonStartCoreMeasurement()
 	// TODO: Add your control notification handler code here
 	UpdateData(TRUE);
 	m_p_CDC_CORE = m_core_color_C.GetDC();
+	CString text;
+	
 	//k6220_set_current(m_core_probe_curr, m_adr_k6220_core);
 	//k6220_onoff(TRUE, m_adr_k6220_core);
-	
-	// configurazione dello sweep
-	// K6220_Sweep_Configuration(m_adr_k6220_core, m_core_probe_curr);
-	
+		
 	// configurazione del Delta
-	K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr);
+	K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr, TRUE);
 
-	//avvio del triggering dello sweep (o del Delta)
-	CString text;
-	text = L"INIT";
+	//avvio del triggering del Delta Mode
+	
+	/*Verifica che il 2182A sia in external trigger mode*/
+	// text = L"SYST:COMM:SER:SEND 'trig:sour ext'"; /* prepares for external triggering */
+	// write_GPIB(address, text);
+	
+	/* Verifica che il Delta Mode sia Armato sul 6220 */
+	text = L"SOURce:DELTa:ARM?";
 	write_GPIB(m_adr_k6220_core, text);
+
+	BOOL delta_arm_status = read_GPIB(m_adr_k6220_core, &text);
+
+	if (delta_arm_status)
+	{
+		text = L"INIT"; /*Starts trigger in Delta Mode*/
+		write_GPIB(m_adr_k6220_core, text);
+	}
+	else AfxMessageBox(L"Delta Mode not ARMed on 6220");
 	
 	SetTimer(2001, 1000, NULL);
 	m_flag_measure_core = 0;
@@ -1547,7 +1559,21 @@ BOOL CminervaRxDlg::k6220_onoff(bool on, long address)
 void CminervaRxDlg::OnBnClickedButtonStopCoreMeasurement2()
 {
 	// TODO: Add your control notification handler code here
-	k6220_onoff(FALSE, m_adr_k6220_core);
+	// k6220_onoff(FALSE, m_adr_k6220_core);
+	
+	CString text = L"ABORt";
+	write_GPIB(m_adr_k6220_core, text);
+
+	text = L"SOURce:DELTa:ARM?";
+	write_GPIB(m_adr_k6220_core, text);
+
+	BOOL delta_arm_status = read_GPIB(m_adr_k6220_core, &text);
+	if (!delta_arm_status)
+		{
+		AfxMessageBox(L"Delta Mode disARMed on Core 6220");
+		}
+	
+	// K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr, FALSE);
 	KillTimer(2001);
 	KillTimer(2002);
 	m_file_core.Close();
@@ -2577,20 +2603,21 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// Adjusts the y-axis scale on the core plot
 	int old_scale = m_scale_plot_core;
-	if (pNMUpDown->iDelta == 1 /*&& m_scale_plot_core> 0.01*/) // tasto GIU'
+	if (pNMUpDown->iDelta == 1 /*&& m_scale_plot_core> 0.01*/) // tasto giù
+		// Qui c'è un problema al 06/07: non si torna più indietro!
+
 	{
 		m_scale_plot_core /= 10.0;
 	}
-	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core <= 0.1) // tasto SU
+	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core < 10.) // tasto su
 	{
 		m_scale_plot_core *= 10.0;
 	}
 
-
 	//CString tmp;
 	//tmp.Format(_T("m_scale_plot_core = %.5f"), m_scale_plot_core);
 	//MessageBox(tmp);
-	double resistance = m_vector_core[m_points_vector_core - 1][1];
+	double R = m_vector_core[m_points_vector_core - 1][1];
 	double time = m_vector_core[m_points_vector_core - 1][0];
 
 	double y_min;
@@ -2598,22 +2625,48 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 
 	if (m_points_vector_core > 2)
 		{
-			//if ((resistance*1.2*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
-		if ((resistance*0.5*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
-				{
-					y_min = m_grafico_core->m_ymin;
-					y_max = m_grafico_core->m_ymax;
-				}
-			else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a piï¿½ o meno il 20% del valore di R)
-				{    // purtoppo quanto cade fuori da questa fascia non sarï¿½ piï¿½ visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
-					y_min = resistance*1.2*m_scale_plot_core;
-					y_max = resistance*0.8*m_scale_plot_core;
-				}
+
+		// if ((resistance*1.2*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
+		// if ((R < m_grafico_core->m_ymax) && (R > m_grafico_core->m_ymin)) // se i valori max e min rientrano nel grafico
+		//		{
+		//			y_min = m_grafico_core->m_ymin;
+		//			y_max = m_grafico_core->m_ymax;
+		//		}
+		//	else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a più o meno il 20% del valore di R)
+		//		{    // purtoppo quanto cade fuori da questa fascia non sarà più visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
+		//			y_min = R*1.2*m_scale_plot_core;
+		//			y_max = R*0.8*m_scale_plot_core;
+		//		}
+		
+		//if ((R < m_grafico_core->m_ymax) && (R > m_grafico_core->m_ymin)) // se i valori max e min rientrano nel grafico
+		//{
+		//	y_min = m_grafico_core->m_ymin;
+		//	y_max = m_grafico_core->m_ymax;
+		//}
+		//else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a più o meno il 20% del valore di R)
+		//{    // purtoppo quanto cade fuori da questa fascia non sarà più visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
+		//	y_min = R*1.2*m_scale_plot_core;
+		//	y_max = R*0.8*m_scale_plot_core;
+		//}
+
+		if ((R + 2.5*m_scale_plot_core) < m_grafico_core->m_ymax && (R - 2.5*m_scale_plot_core) > m_grafico_core->m_ymin)
+			// The current R values is plottable on the canvas given the current m_scale_plot_core value.
+			{
+			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
+			y_max = m_grafico_core->m_ymax;
+			}
+		else
+			{
+			// y_min = R*(1 - 0.25*m_scale_plot_core); /* Re-defines y_min and y_max around the center current value of R */
+			// y_max = R*(1 + 0.25*m_scale_plot_core);
+			y_min = R - 2.5 * m_scale_plot_core;
+			y_max = R + 2.5 * m_scale_plot_core;
+			}
 
 			m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
 			m_grafico_core->x_tick_change(600);
 			//m_grafico_core->y_tick_change((2. / scala) / 5.);
-			m_grafico_core->y_tick_change((y_max - y_min) / 5.); // nuova larghezza dell'unitï¿½ sulle ordinate del grafico
+			m_grafico_core->y_tick_change((y_max - y_min) / 5.); // nuova larghezza dell'unità sulle ordinate del grafico
 			m_grafico_core->plotta_frame();
 		}
 
@@ -2642,14 +2695,6 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	m_grafico_core->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1);
-	//if (m_grafico_core->punto_plottabile(x_min, 0) && m_grafico_core->punto_plottabile(x_max, 0))
-	//	{
-	//		m_grafico_core->CambiaColore(0, 100, 0, 1);
-	//		m_grafico_core->plot_single_point(x_min, 0, TRUE);
-	//		m_grafico_core->plot_single_point(x_max, 0, FALSE);
-	//		m_grafico_core->CambiaColore(0, 0, 200, 2);
-	//	}
-	//}
 
 	*pResult = 0;
 }
@@ -2657,14 +2702,11 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 
 int CminervaRxDlg::plot_core(double time, double R)
 {
-	/*double ymin = R;
-	double ymax = R; */
 	if (m_points_vector_core<DIM_VET_CORE)
 	{
 		m_vector_core[m_points_vector_core][0] = time;
 		m_vector_core[m_points_vector_core][1] = R;
 		m_points_vector_core++;
-
 	}
 	else
 	{
@@ -2688,6 +2730,10 @@ int CminervaRxDlg::plot_core(double time, double R)
 	double y_min;
 	double y_max;
 
+	if (m_points_vector_core > 2)
+	{
+
+		if ((R + 2.5*m_scale_plot_core) < m_grafico_core->m_ymax && (R - 2.5*m_scale_plot_core) > m_grafico_core->m_ymin)
 		// The current R values is plottable on the canvas given the current m_scale_plot_core value.
 		{
 			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
@@ -2695,8 +2741,11 @@ int CminervaRxDlg::plot_core(double time, double R)
 		}
 		else
 		{
+			// y_min = R*(1 - 0.25*m_scale_plot_core); /* Re-defines y_min and y_max around the center current value of R */
+			// y_max = R*(1 + 0.25*m_scale_plot_core);
+			y_min = R - 2.5 * m_scale_plot_core;
+			y_max = R + 2.5 * m_scale_plot_core;
 		}
-
 
 	/* 
 	double y_min = ((delta - 1) / double(scala));
@@ -2711,6 +2760,7 @@ int CminervaRxDlg::plot_core(double time, double R)
 	m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
 	m_grafico_core->x_tick_change(600);
 	/* m_grafico_core->y_tick_change((2. / scala) / 5.); */
+	m_grafico_core->y_tick_change(((y_max - y_min)) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
 	m_grafico_core->plotta_frame();
 	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
 	{
@@ -2721,6 +2771,7 @@ int CminervaRxDlg::plot_core(double time, double R)
 	}
 
 	m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1);
+	}
 	return 1;
 }
 
@@ -4234,19 +4285,28 @@ void CminervaRxDlg::K6220_configuration(int address, int DeltaMode)
 }
 
 // Configures Delta Mode on the 6220
-void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere)
+void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, bool action)
 {
 	UpdateData(TRUE);
+
 	CString text, text1;
-	text1.Format(L"%.1g", microampere / 1000000);
-	text = L"SOURce:DELTa:HIGH ";
-	text += text1;
-	write_GPIB(address, text);
+	if (action == TRUE)
+		{
+		text1.Format(L"%.1g", microampere / 1000000);
+		text = L"SOURce:DELTa:HIGH ";
+		text += text1;
+		write_GPIB(address, text);
 
-	text = L"SOURce:DELTa:CABort OFF";
-	write_GPIB(address, text);
-
-	text = L"SOUR:DELTA:ARM";
-	write_GPIB(address, text);
-
+		text = L"SOURce:DELTa:CABort OFF";
+		write_GPIB(address, text);
+		text = L"SOUR:DELTA:ARM"; /* Arms DELTA and waits for trigger */
+		write_GPIB(address, text);
+		}
+	else if (action == FALSE)
+		{
+		text = L"ABORt";
+		write_GPIB(address, text);
+		text = L"SOURce:SWEep:ABORt"; /*unArms DELTA*/
+		write_GPIB(address, text);
+		}
 }

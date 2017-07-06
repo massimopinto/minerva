@@ -587,8 +587,8 @@ int grafico_ver2::draw_y_label(void)
     
 	 while (y <= m_ymax)
 	 {
-		 label.Format(L"%G",y);
-		 //label.Format(L"%8.2f", y);
+		 //label.Format(L"%G",y);
+		 label.Format(L"%8.3f", y);
 		 posizione_x = m_origine_x ;
 		 posizione_y = m_origine_y +m_altezza - 1 -((y-m_ymin)*m_fattore_y);
 		 puntatoreCDC->TextOut(posizione_x+shift_y,posizione_y,label);

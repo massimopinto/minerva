@@ -404,5 +404,5 @@ public:
 	void K6220_configuration(int address, int DeltaMode);
 	// void K6220_Sweep_Configuration(int address, double microampere);
 	// Configures Delta Mode on the 6220
-	void K6220_Delta_Configuration(int address, double microampere);
+	void K6220_Delta_Configuration(int address, double microampere, bool action);
 };
