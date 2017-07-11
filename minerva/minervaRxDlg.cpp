@@ -2491,9 +2491,9 @@ void CminervaRxDlg::OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult) // Adjusts 
 	{
 		m_scale_plot_thermo *= 10;
 	}
-	CString tmp;
+	/*CString tmp;
 	tmp.Format(_T("m_scale_plot_thermo = %.5f"), m_scale_plot_thermo);
-	MessageBox(tmp);
+	MessageBox(tmp);*/
 	if (m_points_vector_thermo>2)
 	{
 		double x_min = m_grafico_termo->m_xmin;
@@ -2558,7 +2558,8 @@ bool CminervaRxDlg::save_core(long seconds, double resistance, double sigma, dou
 	}
 
 		double delta_t = (10025. - resistance) / (10025. *.04);
-		plot_core(seconds, resistance);
+		// plot_core(seconds, resistance);
+		plot_R(seconds, resistance);
 
 	return false;
 }
@@ -2598,93 +2599,58 @@ int CminervaRxDlg::create_core_graph()
 
 
 void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
-	// Aggiornato con le impostazioni che abbiamo usato per il calorimetro del Cobalto 60 in Maggio 2017  
+	/* This function was updated in 2017 to make the Core plot in terms of resistance Vs time. 
+	Scaling is supplied by decades, on the y-axis. 
+	*/
 {
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// Adjusts the y-axis scale on the core plot
-	int old_scale = m_scale_plot_core;
-	if (pNMUpDown->iDelta == 1 /*&& m_scale_plot_core> 0.01*/) // tasto giù
-		// Qui c'è un problema al 06/07: non si torna più indietro!
+	float previous_scale = m_scale_plot_core; /* May be I need this, may be not */
+	
+	/* CString text;
+	text.Format(L" Current core plot scale=%.5f ", m_scale_plot_core);
+	add_message(text);*/
 
-	{
-		m_scale_plot_core /= 10.0;
-	}
-	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core < 10.) // tasto su
-	{
-		m_scale_plot_core *= 10.0;
-	}
-
-	//CString tmp;
-	//tmp.Format(_T("m_scale_plot_core = %.5f"), m_scale_plot_core);
-	//MessageBox(tmp);
 	double R = m_vector_core[m_points_vector_core - 1][1];
 	double time = m_vector_core[m_points_vector_core - 1][0];
 
-	double y_min;
-	double y_max;
+	double y_min = m_grafico_core->m_ymin;
+	double y_max = m_grafico_core->m_ymax;
+
+	double delta_y = y_max - y_min;
+
+	if (pNMUpDown->iDelta == 1 && m_scale_plot_core > 0.001) /* Button Down pressed: zoom into the plot */
+		{
+		m_scale_plot_core /= 10.0;
+		y_max -= 0.45 * delta_y;
+		y_min += 0.45 * delta_y;
+		}
+		
+	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core < 100.) /* Button Up pressed: zoom out of the plot and increased y-scale */
+		{
+		m_scale_plot_core *= 10.0;
+		y_max += 4.5 * delta_y; /* Magnifies the canvas by a factor of 10 on the y_scale */
+		y_min -= 4.5 * delta_y;
+		}
+	else return; /* don't do anything if conditions were not met.*/
+	 
+	double upper_limit = y_min + 0.95*(y_max - y_min); /* Close to the limits of the frame as this was before the button pressed */
+	double lower_limit = y_min + 0.05*(y_max - y_min);
 
 	if (m_points_vector_core > 2)
 		{
-
-		// if ((resistance*1.2*m_scale_plot_core < m_grafico_core->m_ymax) && (resistance*0.8*m_scale_plot_core > m_grafico_core->m_ymin)) // se i valori max e min sono tali 
-		// if ((R < m_grafico_core->m_ymax) && (R > m_grafico_core->m_ymin)) // se i valori max e min rientrano nel grafico
-		//		{
-		//			y_min = m_grafico_core->m_ymin;
-		//			y_max = m_grafico_core->m_ymax;
-		//		}
-		//	else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a più o meno il 20% del valore di R)
-		//		{    // purtoppo quanto cade fuori da questa fascia non sarà più visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
-		//			y_min = R*1.2*m_scale_plot_core;
-		//			y_max = R*0.8*m_scale_plot_core;
-		//		}
-		
-		//if ((R < m_grafico_core->m_ymax) && (R > m_grafico_core->m_ymin)) // se i valori max e min rientrano nel grafico
-		//{
-		//	y_min = m_grafico_core->m_ymin;
-		//	y_max = m_grafico_core->m_ymax;
-		//}
-		//else // altrimenti si ridefiniscono i valori max e-core min del grafico in maniera che il nuovo valore di R sia visibile (grafico a più o meno il 20% del valore di R)
-		//{    // purtoppo quanto cade fuori da questa fascia non sarà più visibile, a meno di non amplificare o attenuare la scala con i tasti soliti
-		//	y_min = R*1.2*m_scale_plot_core;
-		//	y_max = R*0.8*m_scale_plot_core;
-		//}
-
-		if ((R + 2.5*m_scale_plot_core) < m_grafico_core->m_ymax && (R - 2.5*m_scale_plot_core) > m_grafico_core->m_ymin)
-			// The current R values is plottable on the canvas given the current m_scale_plot_core value.
+		if ( (R + 2.5 * m_scale_plot_core >= upper_limit) || (R - 2.5 * m_scale_plot_core <= lower_limit) ) /* Test condition is with the NEW m_scale_plot_core value */
 			{
-			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
-			y_max = m_grafico_core->m_ymax;
-			}
-		else
-			{
-			// y_min = R*(1 - 0.25*m_scale_plot_core); /* Re-defines y_min and y_max around the center current value of R */
-			// y_max = R*(1 + 0.25*m_scale_plot_core);
-			y_min = R - 2.5 * m_scale_plot_core;
-			y_max = R + 2.5 * m_scale_plot_core;
+				y_min = R - 2.5 * m_scale_plot_core;
+				y_max = R + 2.5 * m_scale_plot_core;
 			}
 
-			m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
-			m_grafico_core->x_tick_change(600);
-			//m_grafico_core->y_tick_change((2. / scala) / 5.);
-			m_grafico_core->y_tick_change((y_max - y_min) / 5.); // nuova larghezza dell'unità sulle ordinate del grafico
-			m_grafico_core->plotta_frame();
+		m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
+		m_grafico_core->x_tick_change(600);
+		// m_grafico_core->y_tick_change( (y_max - y_min) / 5. /* * m_scale_plot_core*/ ); // nuova larghezza dell'unità sulle ordinate del grafico
+		m_grafico_core->y_tick_change( (y_max - y_min) / 5.); // nuova larghezza dell'unità sulle ordinate del grafico
+		m_grafico_core->plotta_frame();
 		}
-
-	//if (m_points_vector_core>2)
-	//{
-		//double x_min = m_grafico_core->m_xmin;
-		//double x_max = m_grafico_core->m_xmax;
-
-		//double delta = m_vector_core[m_points_vector_core - 1][1];
-		//int delta_int = 0;
-		//(delta>0) ? delta_int = (delta*m_scale_plot_core + .5) : delta_int = (delta*m_scale_plot_core - .5);
-		//double y_min = ((delta_int - 1) / double(m_scale_plot_core));
-		//double y_max = ((delta_int + 1) / double(m_scale_plot_core));
-
-		//m_grafico_core->coordinate(x_min, x_max, y_min, y_max);
-		//m_grafico_core->x_tick_change(600);
-		//m_grafico_core->y_tick_change((2. / m_scale_plot_core) / 5.);
-		//m_grafico_core->plotta_frame();
 
 	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
 	{
@@ -2693,12 +2659,80 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 		m_grafico_core->plot_single_point(time + 10, 0, FALSE);
 		m_grafico_core->CambiaColore(0, 100, 0, 2);
 	}
-
-	m_grafico_core->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1);
-
+	m_grafico_core->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1); /* re-freshes the entire vector */
 	*pResult = 0;
 }
 
+//int CminervaRxDlg::plot_R(double time, double R, double &(*graph_vector)[2], int dim, grafico_ver2 *graph)
+//	{	
+//	if (dim < DIM_VET_CORE)
+//		{
+//		graph_vector[dim][0] = time;
+//		graph_vector[dim][1] = R;
+//		}
+//	else 
+//		{
+//		int ctr = 0;
+//		while (ctr<DIM_VET_CORE - 1)
+//		{
+//			graph_vector[ctr][0] = graph_vector[ctr + 1][0];
+//			graph_vector[ctr][1] = graph_vector[ctr + 1][1];
+//			ctr++;
+//		}
+
+//		return 0;
+//	}
+
+int CminervaRxDlg::plot_R(double time, double R)
+{
+	if (m_points_vector_core<DIM_VET_CORE)
+	{
+		m_vector_core[m_points_vector_core][0] = time;
+		m_vector_core[m_points_vector_core][1] = R;
+		m_points_vector_core++;
+	}
+	else
+	{
+		int ctr = 0;
+		while (ctr<DIM_VET_CORE - 1)
+		{
+			m_vector_core[ctr][0] = m_vector_core[ctr + 1][0];
+			m_vector_core[ctr][1] = m_vector_core[ctr + 1][1];
+			ctr++;
+		}
+		m_vector_core[ctr][0] = time;
+		m_vector_core[ctr][1] = R;
+	}
+
+	double y_min = m_grafico_core->m_ymin;
+	double y_max = m_grafico_core->m_ymax;
+
+	double upper_limit = y_min + 0.95*(y_max - y_min); /* Close to the limits of the frame */
+	double lower_limit = y_min + 0.05*(y_max - y_min);
+
+	if (R >= upper_limit || R <= lower_limit) /* When the point being plotted is about to reach the upper or the lower limit of the frame */
+		{
+			y_min = R - 2.5 * m_scale_plot_core;
+			y_max = R + 2.5 * m_scale_plot_core;
+		}
+
+	m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
+	m_grafico_core->x_tick_change(600);
+	m_grafico_core->y_tick_change((y_max - y_min) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
+	m_grafico_core->plotta_frame();
+
+	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
+	{
+		m_grafico_core->CambiaColore(0, 100, 200, 1);
+		m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
+		m_grafico_core->plot_single_point(time + 10, 0, FALSE);
+		m_grafico_core->CambiaColore(0, 0, 200, 2);
+	}
+
+	m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1); /* re-plot the entire vector */
+	
+	return 1;
+}
 
 int CminervaRxDlg::plot_core(double time, double R)
 {
@@ -3252,7 +3286,6 @@ int CminervaRxDlg::plot_aux(double time, double delta_t)
 		m_vector_aux[m_points_vector_aux][0] = time;
 		m_vector_aux[m_points_vector_aux][1] = delta_t;
 		m_points_vector_aux++;
-
 	}
 	else
 	{

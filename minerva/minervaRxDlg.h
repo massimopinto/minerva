@@ -233,6 +233,8 @@ public:
 	int create_core_graph();
 	afx_msg void OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult);
 	int plot_core(double time, double resistance);
+	// int plot_R(double time, double R, double &(*graph_vector)[2], int dim, grafico_ver2 *graph);
+	int plot_R(double time, double R);
 	CDC *m_p_CDC_CORE; 
 	CDC *m_p_CDC_AUX;
 	double m_I_PID;
