@@ -1625,7 +1625,8 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 		ctr++;
 	}
 	double mean = resistance, sigma = 999, trend = 999;
-	trend = 60*(-(resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (0.04*resistance)) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]);
+	trend = 60 * (resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]); /* speed, in Ohm min**-1 */
+	// trend = 60*(-(resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (0.04*resistance)) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]);
 	m_media_core[m_elements_into_mean_core - 1][1] = resistance; /*occhio che qui c'è stata una conversione di data type*/
 	m_media_core[m_elements_into_mean_core - 1][0] = m_seconds_continuous; /* Time when resistance value was fetched by K2182A*/ 
 	// m_vettore_tempo[m_contatore_punti] = (clock()+500)/1000 -m_secondi_start;
@@ -1661,9 +1662,7 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 		m_core_resistance_STD_C.SetWindowTextW(m_aux_text);
 
 		/* Calculate trend value and send it to its window */
-		trend = -60 * m_linear_regression.m_coefficiente_angolare / (.04*mean);
-	
-
+		trend = -60 * m_linear_regression.m_coefficiente_angolare /* / (.04*mean) */;
 		/*
 		
 		termo(trend, trend_CDC);
@@ -3742,7 +3741,7 @@ void CminervaRxDlg::OnBnClickedButtonReadThermo()
 BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 {
 	static int ctr = 0, discharge = 0;
-	static double  integrator = 0;
+	static double  integrator = 0.;
 	static double mean_resistance = 0;
 	CString aux_text;
 	if (m_status_thermostat == INIT)
@@ -3771,26 +3770,27 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 		m_thermostat_completed_C.SetWindowTextW(aux_text);
 
 		if (ctr >= m_mean_thermostat) // If the number of prescribed measurements is complete, go ahead with plotting and saving. 
-			// if requested, re-calculate the current injection via PID(resistance,deltaT, speed).
+			// if requested, re-calculate the current injection via PID(resistance, deltaT, speed).
 		{
-			// definition of local variables for output to thermostat file and to graph, and call to PID() if necessary; 
+			// definition of local variables for output to thermostat file and to graph, and call to PID() unless 'frozen'; 
 			static long old_time = 0;
 			static double thermospeed = .1;
 			long time = clock();
-			double error = m_set_point - resistance;
-			double delta_T = (((m_set_point - resistance) / fabs(m_set_point)) / 0.04);
-			double delta_R = m_set_point - resistance; 
-			m_aux_text.Format(L"%g", delta_T);
+			// double error = m_set_point - resistance;
+			// double delta_T = (((m_set_point - resistance) / fabs(m_set_point)) / 0.04);
+			double delta_R = m_set_point - mean_resistance /*resistance*/;
+			m_aux_text.Format(L"%g", delta_R);
 			m_delta_k_C.SetWindowText(m_aux_text);
-			if (m_old_thermo_temperature) // Calcolo della velocità istantanea (ultime due misure)
+			if (m_old_thermo_resistance) // Calcolo della velocità istantanea (ultime due misure)
 			{ 
-				thermospeed = 60000 * (delta_T - m_old_thermo_temperature) / (time - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
+				// thermospeed = 60000 * (delta_T - m_old_thermo_temperature) / (time - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
+				thermospeed = 60000 * (delta_R - m_old_thermo_resistance) / (time - old_time); /* thermostat speed in delta_R /min */
 				m_aux_text.Format(L"%6.3g ", thermospeed);
 				//termo(speed, p_termo);
 				m_speed_shield_C.SetWindowText(m_aux_text);
 				thermo(thermospeed, m_p_CDC);
 			}
-			m_old_thermo_temperature = delta_T; 
+			m_old_thermo_resistance = /*delta_T*/ delta_R; 
 	
 			m_aux_text.Format(L"%6.5g", m_power_thermostat); // occhio che power deve essere aggiornato anche da PID, se questo viene chiamato;
 			m_microW_shield_C.SetWindowTextW(m_aux_text);
@@ -3799,15 +3799,16 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 			// Massimo is making changes here: first one updates the vector with the delta_T and times, then calculates integral and derived quantities to be passed over to PID();
 
 			Write_To_File_Thermostat_Shield(m_set_point, resistance, delta_R, m_power_thermostat, thermospeed); // Handles the thermostat log file
-			plot_thermostat(m_seconds_continuous_thermostat, error); // Handles the thermostat plot, adding the current point to the graph.
+			plot_thermostat(m_seconds_continuous_thermostat, delta_R); // Handles the thermostat plot, adding the current point to the graph.
 			// plot_thermostat(m_seconds_continuous_thermostat, error, true); // Handles the thermostat plot, adding the current point to the graph.
 			manage_thermo_deltaR_vector(delta_R, m_seconds_continuous_thermostat);  // Copies current delta_R and time inside the deltaR_vector;
 				// This is useful also to calculate the average speed of the last N points, for the derivative term of PID
 				// it is also useful if you need to make an integration of delta_R, for the implementation of the integral part of PID().
+
 			if (m_deltaR_thermostat[0][0] != 0) // If all delta_R vector's positions have been filled, the vector is ready for averageing its contents.
 			{
 				m_linear_regression.calcola_regressione(m_deltaR_thermostat, 0, m_elements_into_average_thermospeed - 1);
-				m_average_thermospeed = 60 * m_linear_regression.m_coefficiente_angolare;
+				m_average_thermospeed = 60 * m_linear_regression.m_coefficiente_angolare; /* pendenza del fit lineare, dato in Ohm / minuto*/
 				m_aux_text.Format(L"%6.5g", m_average_thermospeed);
 				m_average_speed_shield_C.SetWindowTextW(m_aux_text);
 			}
@@ -3817,9 +3818,9 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 				// PID(mean_resistance); // this was the call to the old PID function (until July 2014); 
 
 				if (m_average_thermospeed == 999) // If the average speed has not been calculated yet
-					//PID(mean_resistance, delta_T, thermospeed);  // call PID() with instantaneous speed
-					PID_2017(mean_resistance, error, thermospeed);
-				else PID_2017(mean_resistance, error, m_average_thermospeed); // otherwise call PID() with average thermostat speed.
+					//PID(mean_resistance, delta_T, thermospeed);  
+					PID_2017(mean_resistance, delta_R, thermospeed); // call PID() with instantaneous speed
+				else PID_2017(mean_resistance, delta_R, m_average_thermospeed); // otherwise call PID() with average thermostat speed.
 			}
 			old_time = time;
 			discharge = 0;
@@ -4081,7 +4082,7 @@ void CminervaRxDlg::PID_2017(double resistance, double error, double speed)
 	double thermostat_resistance = RESISTANCE_THERMOSTAT;
 	double milliampere = 0.;
 	double power = m_power_thermostat;
-	double eta = -error / speed;
+	double eta = - error / speed;
 
 	m_do_noting++;
 	CString tmp;
