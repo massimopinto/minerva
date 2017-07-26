@@ -869,7 +869,7 @@ i.e. the source meter sources current and reads voltage (which is presumably pas
 	text = L":SENS:VOLT:RANGE:AUTO ON";
 	write_GPIB(address, text);
 
-	text = L":SENS:VOLT:DC:NPLC 1";
+	text = L":SENS:VOLT:DC:NPLC 1"; /* Analog filtration over 1 power line cycles */
 	write_GPIB(address, text);
 
 	text = L":SENS:VOLT:CHAN1:DFIL:STAT ON";
@@ -987,6 +987,8 @@ void CminervaRxDlg::K6220_configuration(int address)
 	text.Format(L"CURR  %6.3g", 15. / 1000000.);
 	write_GPIB(address, text);
 
+	if (address == m_adr_k6220_core)
+	{
 	/* settaggi 2182 attraverso seriale (delta mode)*/
 
 	//text = L"SYST:COMM:SER:SEND '*rst'"; /*Resets the 2182A to defaults */
@@ -1038,9 +1040,6 @@ void CminervaRxDlg::K6220_configuration(int address)
 	//text = L":TRIG:COUN 2"; /* SM - Trig count 2: one positive (high) and one negative (low). */
 	//write_GPIB(address, text);
 
-	//text = L"SOUR:CURR:RANG 10e-6"; /* Selects the XX.XXX range on the 6220. */
-	//write_GPIB(address, text);
-
 	text = L"UNIT:VOLT V"; /* Specifies that Volts readings are sent from 2182 to 6220. */
 	write_GPIB(address, text);
 
@@ -1052,6 +1051,12 @@ void CminervaRxDlg::K6220_configuration(int address)
 
 	text = L"TRIG:DIR SOUR"; /* SM - Enable source bypass */
 	write_GPIB(address, text);
+	}
+	else if (address == m_adr_k6220_multi)
+	{
+		text = L"CURR:FILT ON"; /*turns on source-meter filtering*/
+		write_GPIB(address, text);
+	}
 
 	return ;
 }
