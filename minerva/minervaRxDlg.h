@@ -163,7 +163,8 @@ public:
 	/* Time declarations */
 	CTime m_seconds_absolute;
 	CTime m_seconds_beginning_Dec_2013; 
-	long m_seconds_continuous; 
+	/* long m_seconds_continuous; Questo era un long, Massimo lo cambia in double al 29/03/2018*/ 
+	double m_seconds_continuous;
 	BOOL request_data_core();
 	double read_resistance(int address, BOOL core=TRUE);
 	double manage_data_core(double resistance);
@@ -226,7 +227,7 @@ public:
 	float m_scale_plot_aux;
 	afx_msg void OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult);
 	BOOL create_file_core();
-	bool save_core(long seconds, double resistance, double sigma, double trend);
+	bool save_core(double seconds, double resistance, double sigma, double trend);
 	// afx_msg void OnBnClickedStaticGraph();
 	afx_msg void OnBnClickedButtonStopShieldInject();
 	CStatic m_graph_core_C;

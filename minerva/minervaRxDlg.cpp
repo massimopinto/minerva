@@ -11,7 +11,7 @@
 #define new DEBUG_NEW
 #endif
 
-#define TIMER_CORE 1000
+#define TIMER_CORE  500 /* a measurement every 0.5 seconds! 1000*/
 #define TIMER_THERMOSTAT 5000   // Every 5 seconds (holding time)
 #define TIMER_AUX 10000	// Auxiliary thermistors timer interval
 #define RESISTANCE_THERMOSTAT 40000
@@ -869,21 +869,27 @@ i.e. the source meter sources current and reads voltage (which is presumably pas
 	text = L":SENS:VOLT:RANGE:AUTO ON";
 	write_GPIB(address, text);
 
-	text = L":SENS:VOLT:DC:NPLC 1"; /* Analog filtration over 1 power line cycles */
+	text = L":SENS:VOLT:DC:NPLC 1"; /* Single measurement carried out over 5 power line cycles */
 	write_GPIB(address, text);
 
-	text = L":SENS:VOLT:CHAN1:DFIL:STAT ON";
-	write_GPIB(address, text);
-
-	/*text = L":SENS:VOLT:DFIL:STAT OFF";
-	write_GPIB(address, text);*/
-
-	text = L":SENS:VOLT:DFIL:WIND 0.01";
-	write_GPIB(address, text);
-
-	text = L":SENS:VOLT:DFIL:TCON REP";
+	text = L":SENS:VOLT:LPAS OFF"; /* Analog filtration off */
 	write_GPIB(address, text);
 	
+	//text = L":SENS:VOLT:CHAN1:DFIL:STAT OFF"; /*turning off digital filtration to check speed*/
+	//write_GPIB(address, text);
+
+
+	text = L":SENS:VOLT:DFIL:COUN 20"; /*Will COUNt 20 measurements in the stack prior to calculate an average and output a value*/
+	write_GPIB(address, text);
+
+	text = L":SENS:VOLT:DFIL:WIND 0.01"; /*was 0.01 until 20170802. This is 0.01% of the RANGE, which is currently automatic.*/
+	write_GPIB(address, text);
+
+	text = L":SENS:VOLT:DFIL:TCON REP"; /* The vector of COUN individual values is purged and REPeated at each new measurement.*/
+	write_GPIB(address, text);
+	
+	text = L":SENS:VOLT:CHAN1:DFIL:STAT ON"; /* turn Digital filter STATus on*/
+	write_GPIB(address, text);
 /*	CString text;
 	text = L":SENS:VOLT:RANGE:AUTO ON";
 	write_GPIB(address, text);
@@ -1629,7 +1635,7 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 		m_media_core[ctr][1] = m_media_core[ctr + 1][1]; // resistance
 		ctr++;
 	}
-	double mean = resistance, sigma = 999, trend = 999;
+	double mean = resistance, sigma = 999, trend = 999.;
 	trend = 60 * (resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]); /* speed, in Ohm min**-1 */
 	// trend = 60*(-(resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (0.04*resistance)) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]);
 	m_media_core[m_elements_into_mean_core - 1][1] = resistance; /*occhio che qui c'è stata una conversione di data type*/
@@ -1744,27 +1750,24 @@ double CminervaRxDlg::manage_data_core(double resistance)
 
 	if (m_seconds_t_zero != 0)
 	{
-		m_seconds_continuous = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+		m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
+		
+		// !!!!!
+		// Qui dovresti usare una funzione che restituisca il tempo con la precisione del millisecondo, non del secondo intero.
+		// !!!!
 	}
 	else
 	{
 		m_seconds_t_zero = CTime::GetCurrentTime();
 		// m_seconds_continuous = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime();
-		m_seconds_continuous = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+		m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
 	}
-	
-	
+
 	manage_core_media(resistance);
 
 	text.Format(L"%9.9f", resistance);
 	m_core_resistance_C.SetWindowTextW(text);
 
-	/*gestisci_media_continuo(resistenza);*/
-
-	//text.Format(L"%d", m_seconds_continuous);
-	//m_core_resistance_mean_C.SetWindowTextW(text);
-
-	
 	return resistance;
 }
 
@@ -2312,7 +2315,7 @@ unsigned long CminervaRxDlg::Write_To_File_Thermostat_Shield(double target, doub
 	 // = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime();
 	if (m_seconds_t_zero != 0)
 	{
-		m_seconds_continuous_thermostat = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+			m_seconds_continuous_thermostat = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
 	}
 	else
 	{
@@ -2551,13 +2554,13 @@ BOOL CminervaRxDlg::create_file_core()
 }
 
 
-bool CminervaRxDlg::save_core(long seconds, double resistance, double sigma, double trend)
+bool CminervaRxDlg::save_core(double seconds, double resistance, double sigma, double trend)
 {
 	
 		if (m_file_core.m_hFile != CFile::hFileNull)
 	{
 		CString aux;
-		aux.Format(L" %6d \t%9.9g \t%7.5g \t%9.9g \t%2d \n", seconds, resistance, sigma, trend, m_thermo_freeze);
+		aux.Format(L" %.5f \t%9.9g \t%7.5g \t%9.9g \t%2d \n", seconds, resistance, sigma, trend, m_thermo_freeze);
 		m_file_core.WriteString(aux);
 	}
 
