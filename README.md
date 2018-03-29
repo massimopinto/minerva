@@ -2,6 +2,8 @@
 
 ## Minerva is a software that assists piloting the Rx graphite calorimeter at ENEA-INMRI
 
+Note: This version of minerva is hosted on GitLab installed on the inmribackup server via Docker/Container 
+
 The [Italian National Institute for Metrology of Ionizing Radiation](http://www.inmri.enea.it) runs a series of *primary standards* for the measurement of *quantities* related to the many uses of ionizing radiation. Among these, *absorbed dose to water* is the main quantity of interest in *dosimetry for radiation therapy of cancer*.
 
 Minerva is a Microsoft Visual Studio-based software that was initiated around 2012 by Stefano Loreti at ENEA-INMRI to digitalize the calorimetry expertiese that existed at the time in the institute. The sofware was written to pilot the recently constructed graphite calorimeter for HDR Brachytherapy dosimetry (Guerra et al, 2012). It was then expanded for the x-ray dosimetry calorimeter (Pinto et al, 2016), which is the basis for this repository, and it's being concurrently adopted for the oldest and most established calorimeter at ENEA-INMRI, the four-bodied calorimeter for dosimetry on 60-Co beams. 
