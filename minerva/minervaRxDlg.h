@@ -161,7 +161,7 @@ public:
 	int m_elements_into_mean_core;
 	
 	/* Time declarations */
-	CTime m_seconds_absolute;
+	double m_seconds_absolute;
 	CTime m_seconds_beginning_Dec_2013; 
 	/* long m_seconds_continuous; Questo era un long, Massimo lo cambia in double al 29/03/2018*/ 
 	double m_seconds_continuous;
@@ -302,7 +302,7 @@ public:
 	afx_msg void OnDeltaposSpinAux(NMHDR *pNMHDR, LRESULT *pResult);
 	bool save_aux(long seconds, double resistance, double sigma, double trend);
 	BOOL create_file_aux();
-	int plot_aux(double time, double delta_t);
+	int plot_aux(double time, double delta_R);
 	// Drives the reading of one auxiliary thermistor via the 7001 switch
 	BOOL manage_aux();
 	// Control variable to alter the color of the auxiliary LED status
@@ -355,7 +355,7 @@ public:
 	afx_msg void OnBnClickedCancel();
 	afx_msg void OnBnClickedOk();
 	// The zero time that gets set upon starting either reading
-	CTime m_seconds_t_zero;
+	double m_seconds_t_zero;
 	// differental power, in micro Watt, as calculated in derivative mode (derivative delta, only)
 	CEdit m_delta_uW_shield_C;
 	// Display mA really injected in the shield as a result of all PID calculations

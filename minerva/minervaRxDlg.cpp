@@ -362,7 +362,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_points_vector_thermo = 0;
 	 m_points_vector_core = 0;
 	 m_points_vector_aux = 0;
-	 m_scale_plot_thermo = 0.001;
+	 m_scale_plot_thermo = (float) 0.001;
 	 m_scale_plot_core = 1;
 	 m_scale_plot_aux = 1;
 	 m_thermostat_reading_interval = TIMER_THERMOSTAT / 1000.;
@@ -1746,21 +1746,23 @@ double CminervaRxDlg::manage_data_core(double resistance)
 	// CTime today = CTime::GetCurrentTime(); /* potrebbe non esser necessario */
 	/* m_seconds_beginning_2013 = CTime(today.GetYear, today.GetMonth, today.GetDay, 0, 0, 0); */
 	/* m_secondi_assoluti = CTime::GetCurrentTime(); */
-	m_seconds_absolute = CTime::GetCurrentTime();
+	m_seconds_absolute = ((double)clock() / (double)CLOCKS_PER_SEC);
 
 	if (m_seconds_t_zero != 0)
 	{
-		m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
-		
-		// !!!!!
-		// Qui dovresti usare una funzione che restituisca il tempo con la precisione del millisecondo, non del secondo intero.
-		// !!!!
+		// m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
+		m_seconds_continuous = ((double)clock() / (double)CLOCKS_PER_SEC) - m_seconds_t_zero;/* borrowed from Gianluca's Misura. clock() returns an integer, in milliseconds*/
+		/* 
+		((double) clock() / (double) CLOCKS_PER_SEC)
+		Qui dovresti usare una funzione che restituisca il tempo con la precisione del millisecondo, non del secondo intero.
+		*/ 
 	}
 	else
 	{
-		m_seconds_t_zero = CTime::GetCurrentTime();
+		m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
 		// m_seconds_continuous = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime();
-		m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
+		// m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
+		m_seconds_continuous = m_seconds_t_zero;
 	}
 
 	manage_core_media(resistance);
@@ -1794,7 +1796,7 @@ void CminervaRxDlg::OnBnClickedButtonStartThermo()
 	k_2400_onoff(TRUE, m_adr_k2400);
 
 	if (m_seconds_t_zero != 0)
-		m_seconds_t_zero = CTime::GetCurrentTime();
+		m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
 	
 	create_empty_deltaR_thermostat_vector();
 	create_thermo_graph(); 
@@ -2310,17 +2312,17 @@ void CminervaRxDlg::Create_Thermostat_Shield_File(void)
 
 unsigned long CminervaRxDlg::Write_To_File_Thermostat_Shield(double target, double sensor, double deltaR, double power, double speed)
 {
-	m_seconds_absolute = CTime::GetCurrentTime();
+	m_seconds_absolute = ((double)clock() / (double)CLOCKS_PER_SEC);
 	
 	 // = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime();
 	if (m_seconds_t_zero != 0)
 	{
-			m_seconds_continuous_thermostat = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+			m_seconds_continuous_thermostat = m_seconds_absolute - m_seconds_t_zero;
 	}
 	else
 	{
-		m_seconds_t_zero = CTime::GetCurrentTime();
-		m_seconds_continuous_thermostat = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+		m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
+		m_seconds_continuous_thermostat = m_seconds_absolute - m_seconds_t_zero;
 	}
 	
 	if (m_file_thermo_shield.m_hFile != CFile::hFileNull)
@@ -2723,7 +2725,7 @@ int CminervaRxDlg::plot_R(double time, double R)
 			y_max = R + 2.5 * m_scale_plot_core;
 		}
 
-	m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
+	m_grafico_core->coordinate((long) floor(time - 3589), (long) floor(time + 11), y_min, y_max);
 	m_grafico_core->x_tick_change(600);
 	m_grafico_core->y_tick_change((y_max - y_min) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
 	m_grafico_core->plotta_frame();
@@ -2741,80 +2743,7 @@ int CminervaRxDlg::plot_R(double time, double R)
 	return 1;
 }
 
-int CminervaRxDlg::plot_core(double time, double R)
-{
-	if (m_points_vector_core<DIM_VET_CORE)
-	{
-		m_vector_core[m_points_vector_core][0] = time;
-		m_vector_core[m_points_vector_core][1] = R;
-		m_points_vector_core++;
-	}
-	else
-	{
-		int ctr = 0;
-		while (ctr<DIM_VET_CORE - 1)
-		{
-			m_vector_core[ctr][0] = m_vector_core[ctr + 1][0];
-			m_vector_core[ctr][1] = m_vector_core[ctr + 1][1];
-			ctr++;
-		}
-		m_vector_core[ctr][0] = time;
-		m_vector_core[ctr][1] = R;
-	}
 
-	// portion commented, as tested on Calorimetro Co60 in May 2017
-	// Questo era il vecchio modo di graficare i dati di deltaT, centrati intorno allo zero.
-	/* int scala = m_scale_plot_core;
-	int delta;
-	(resistance>0) ? delta = (resistance*scala + .5) : delta = (resistance*scala - .5); */
-
-	double y_min;
-	double y_max;
-
-	if (m_points_vector_core > 2)
-	{
-
-		if ((R + 2.5*m_scale_plot_core) < m_grafico_core->m_ymax && (R - 2.5*m_scale_plot_core) > m_grafico_core->m_ymin)
-		// The current R values is plottable on the canvas given the current m_scale_plot_core value.
-		{
-			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
-			y_max = m_grafico_core->m_ymax;
-		}
-		else
-		{
-			// y_min = R*(1 - 0.25*m_scale_plot_core); /* Re-defines y_min and y_max around the center current value of R */
-			// y_max = R*(1 + 0.25*m_scale_plot_core);
-			y_min = R - 2.5 * m_scale_plot_core;
-			y_max = R + 2.5 * m_scale_plot_core;
-		}
-
-	/* 
-	double y_min = ((delta - 1) / double(scala));
-	double y_max = ((delta + 1) / double(scala));
-	if (resistance<m_grafico_core->m_ymax && resistance>m_grafico_core->m_ymin)
-	{
-		y_min = m_grafico_core->m_ymin;
-		y_max = m_grafico_core->m_ymax;
-
-	}
-	*/
-	m_grafico_core->coordinate(time - 3589, time + 11, y_min, y_max);
-	m_grafico_core->x_tick_change(600);
-	/* m_grafico_core->y_tick_change((2. / scala) / 5.); */
-	m_grafico_core->y_tick_change(((y_max - y_min)) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
-	m_grafico_core->plotta_frame();
-	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
-	{
-		m_grafico_core->CambiaColore(0, 100, 200, 1);
-		m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
-		m_grafico_core->plot_single_point(time + 10, 0, FALSE);
-		m_grafico_core->CambiaColore(0, 0, 200, 2);
-	}
-
-	m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1);
-	}
-	return 1;
-}
 
 
 void CminervaRxDlg::OnEnChangeEdit1()
@@ -3283,6 +3212,7 @@ BOOL CminervaRxDlg::create_file_aux()
 		;
 }
 
+/* Plot aux based on delta_T, now moving to resistance readings as for the other plots.
 
 int CminervaRxDlg::plot_aux(double time, double delta_t)
 {
@@ -3331,6 +3261,133 @@ int CminervaRxDlg::plot_aux(double time, double delta_t)
 	}
 		
 	m_grafico_aux->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1);
+	return 1;
+}
+*/
+
+int CminervaRxDlg::plot_aux(double time, double R)
+{
+	if (m_points_vector_core<DIM_VET_CORE)
+	{
+		m_vector_aux[m_points_vector_aux][0] = time;
+		m_vector_aux[m_points_vector_aux][1] = R;
+		m_points_vector_aux++;
+	}
+	else
+	{
+		int ctr = 0;
+		while (ctr<DIM_VET_AUX - 1)
+		{
+			m_vector_aux[ctr][0] = m_vector_aux[ctr + 1][0];
+			m_vector_aux[ctr][1] = m_vector_aux[ctr + 1][1];
+			ctr++;
+		}
+		m_vector_aux[ctr][0] = time;
+		m_vector_aux[ctr][1] = R;
+	}
+
+	double y_min = m_grafico_aux->m_ymin;
+	double y_max = m_grafico_aux->m_ymax;
+
+	double upper_limit = y_min + 0.95*(y_max - y_min); /* Close to the limits of the frame */
+	double lower_limit = y_min + 0.05*(y_max - y_min);
+
+	if (R >= upper_limit || R <= lower_limit) /* When the point being plotted is about to reach the upper or the lower limit of the frame */
+	{
+		y_min = R - 2.5 * m_scale_plot_aux;
+		y_max = R + 2.5 * m_scale_plot_aux;
+	}
+
+	m_grafico_aux->coordinate((long) floor(time - 3589), (long) floor(time + 11), y_min, y_max);
+	m_grafico_aux->x_tick_change(600);
+	m_grafico_aux->y_tick_change((y_max - y_min) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
+	m_grafico_aux->plotta_frame();
+
+	if (m_grafico_aux->punto_plottabile(time - 3588, 0) && m_grafico_aux->punto_plottabile(time + 10, 0))
+	{
+		m_grafico_aux->CambiaColore(0, 100, 200, 1);
+		m_grafico_aux->plot_single_point(time - 3588, 0, TRUE);
+		m_grafico_aux->plot_single_point(time + 10, 0, FALSE);
+		m_grafico_aux->CambiaColore(0, 0, 200, 2);
+	}
+
+	m_grafico_aux->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1); /* re-plot the entire vector */
+
+	return 1;
+}
+
+int CminervaRxDlg::plot_core(double time, double resistance)
+{
+	if (m_points_vector_core<DIM_VET_CORE)
+	{
+		m_vector_core[m_points_vector_core][0] = time;
+		m_vector_core[m_points_vector_core][1] = resistance;
+		m_points_vector_core++;
+	}
+	else
+	{
+		int ctr = 0;
+		while (ctr<DIM_VET_CORE - 1)
+		{
+			m_vector_core[ctr][0] = m_vector_core[ctr + 1][0];
+			m_vector_core[ctr][1] = m_vector_core[ctr + 1][1];
+			ctr++;
+		}
+		m_vector_core[ctr][0] = time;
+		m_vector_core[ctr][1] = resistance;
+	}
+
+	// portion commented, as tested on Calorimetro Co60 in May 2017
+	// Questo era il vecchio modo di graficare i dati di deltaT, centrati intorno allo zero.
+	/* int scala = m_scale_plot_core;
+	int delta;
+	(resistance>0) ? delta = (resistance*scala + .5) : delta = (resistance*scala - .5); */
+
+	double y_min;
+	double y_max;
+
+	if (m_points_vector_core > 2)
+	{
+
+		if ((resistance + 2.5*m_scale_plot_core) < m_grafico_core->m_ymax && (resistance - 2.5*m_scale_plot_core) > m_grafico_core->m_ymin)
+			// The current R values is plottable on the canvas given the current m_scale_plot_core value.
+		{
+			y_min = m_grafico_core->m_ymin; /*copies the current graph limits to the local variables y_min and y_max*/
+			y_max = m_grafico_core->m_ymax;
+		}
+		else
+		{
+			// y_min = R*(1 - 0.25*m_scale_plot_core); /* Re-defines y_min and y_max around the center current value of R */
+			// y_max = R*(1 + 0.25*m_scale_plot_core);
+			y_min = resistance - 2.5 * m_scale_plot_core;
+			y_max = resistance + 2.5 * m_scale_plot_core;
+		}
+
+		/*
+		double y_min = ((delta - 1) / double(scala));
+		double y_max = ((delta + 1) / double(scala));
+		if (resistance<m_grafico_core->m_ymax && resistance>m_grafico_core->m_ymin)
+		{
+		y_min = m_grafico_core->m_ymin;
+		y_max = m_grafico_core->m_ymax;
+
+		}
+		*/
+		m_grafico_core->coordinate((long)floor(time - 3589), (long)floor(time + 11), y_min, y_max);
+		m_grafico_core->x_tick_change(600);
+		/* m_grafico_core->y_tick_change((2. / scala) / 5.); */
+		m_grafico_core->y_tick_change(((y_max - y_min)) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
+		m_grafico_core->plotta_frame();
+		if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
+		{
+			m_grafico_core->CambiaColore(0, 100, 200, 1);
+			m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
+			m_grafico_core->plot_single_point(time + 10, 0, FALSE);
+			m_grafico_core->CambiaColore(0, 0, 200, 2);
+		}
+
+		m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1);
+	}
 	return 1;
 }
 
@@ -3387,24 +3444,24 @@ BOOL CminervaRxDlg::manage_aux()
 			if (manage_mean_aux(resistance)) // Se la media è stata correttamente effettuata con il numero di punti desiderato
 			{ // uscita dal timer "breve" e apertura di tutti i canali dello switch. Ritorno al timer "lungo". 
 				KillTimer(5000);
-				m_seconds_absolute = CTime::GetCurrentTime();
+				m_seconds_absolute = ((double)clock() / (double)CLOCKS_PER_SEC);
 				
-				long seconds; // = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime(); // Quessta era la struttura in brachiterapia.
+				double seconds; // = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime(); // Quessta era la struttura in brachiterapia.
 				if (m_seconds_t_zero != 0)
 				{
-					seconds = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+					seconds = m_seconds_absolute - m_seconds_t_zero;
 				}
 				else
 				{
-					m_seconds_t_zero = CTime::GetCurrentTime();
-					seconds = m_seconds_absolute.GetTime() - m_seconds_t_zero.GetTime();
+					m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
+					seconds = m_seconds_absolute - m_seconds_t_zero;
 				}
 
 				/*metti qui la definizione del trend ed il thermo_plot*/
 
 				static double old_time = 0. , old_delta_t = 0.;
 				double delta_t = (9735.5 - /*resistance*/ m_mean_resistance_aux) / (9735.5 * .04);
-				plot_aux(seconds, delta_t);
+				plot_aux(seconds, m_mean_resistance_aux);
 				double speed = 0.;
 				if (old_time > 0)
 				{
