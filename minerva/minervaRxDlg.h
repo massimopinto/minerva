@@ -198,7 +198,7 @@ public:
 	BOOL manage_mean_thermostat(double resistance);
 	int PID(double resistance);
 	double m_old_thermo_temperature;
-	int thermo(double speed, CDC * pCDC);
+	int thermo(double speed, CDC * pCDC); // Color-coding of the resistance variation over time
 	CDC *m_p_CDC;
 	CStatic m_therm_color_C;
 	int m_derivative_power;
@@ -354,7 +354,7 @@ public:
 	long m_old_time;
 	afx_msg void OnBnClickedCancel();
 	afx_msg void OnBnClickedOk();
-	// The zero time that gets set upon starting either reading
+	// The zero time that gets set upon starting any reading (Core, Jacket, or medium-shield)
 	double m_seconds_t_zero;
 	// differental power, in micro Watt, as calculated in derivative mode (derivative delta, only)
 	CEdit m_delta_uW_shield_C;

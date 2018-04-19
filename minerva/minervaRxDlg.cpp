@@ -365,8 +365,8 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_scale_plot_thermo = (float) 0.001;
 	 m_scale_plot_core = 1;
 	 m_scale_plot_aux = 1;
-	 m_thermostat_reading_interval = TIMER_THERMOSTAT / 1000.;
-	 m_aux_reading_interval = TIMER_AUX / 1000.; 
+	 m_thermostat_reading_interval = (int) ceil(TIMER_THERMOSTAT / 1000.);
+	 m_aux_reading_interval = (int) ceil(TIMER_AUX / 1000.); 
 	 m_p_status_switch[1] = &m_CH1_C;
 	 m_p_status_switch[2] = &m_CH2_C;
 	 m_p_status_switch[3] = &m_CH3_C;
@@ -840,7 +840,7 @@ BOOL CminervaRxDlg::read_GPIB(int address, CString * p_text)
 {
 	int result = ibrd(address, m_string, 200);
 	IBSTA();
-	int ctr = 0;
+	unsigned long ctr = 0;
 	p_text->Delete(0,1000);
 	while (ctr < ibcntl)
 	{
@@ -1419,7 +1419,7 @@ void CminervaRxDlg::OnBnClickedButtonSetPoint()
 }
 
 
-double CminervaRxDlg::read_core() /* cAMBIARE NOME QUI E CHIAMARLA requesT_CORE */
+double CminervaRxDlg::read_core() 
 
 {
 	char spr;
@@ -1496,7 +1496,7 @@ int CminervaRxDlg::load_elements_media()
 
 void CminervaRxDlg::OnBnClickedButtonStartCoreMeasurement()
 {
-	// TODO: Add your control notification handler code here
+	
 	UpdateData(TRUE);
 	m_p_CDC_CORE = m_core_color_C.GetDC();
 	CString text;
@@ -1636,16 +1636,15 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 		ctr++;
 	}
 	double mean = resistance, sigma = 999, trend = 999.;
+	// Calculates speed based on the current resistance (and time) relative to the previous resistance value stored in the m_media_core vector.
 	trend = 60 * (resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]); /* speed, in Ohm min**-1 */
 	// trend = 60*(-(resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (0.04*resistance)) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]);
 	m_media_core[m_elements_into_mean_core - 1][1] = resistance; /*occhio che qui c'è stata una conversione di data type*/
 	m_media_core[m_elements_into_mean_core - 1][0] = m_seconds_continuous; /* Time when resistance value was fetched by K2182A*/ 
-	// m_vettore_tempo[m_contatore_punti] = (clock()+500)/1000 -m_secondi_start;
-
+	
 	// Calculations of mean, stdev, and trend
 
-	ctr = 0;
-	double accumulator = 0;
+	double accumulator = 0; // No loner used, consider deletion.
 
 	if (m_elements_into_mean_core == 1)
 	{
@@ -1664,16 +1663,14 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 		m_aux_text.Format(L"%9.9f", mean);
 		m_core_resistance_mean_C.SetWindowTextW(m_aux_text);
 
-		
 		/* Calculate Stdev value and send it to its window */
 		sigma = m_linear_regression.m_standard_dev;
-		
 		
 		m_aux_text.Format(L"%6.5g", sigma);
 		m_core_resistance_STD_C.SetWindowTextW(m_aux_text);
 
 		/* Calculate trend value and send it to its window */
-		trend = -60 * m_linear_regression.m_coefficiente_angolare /* / (.04*mean) */;
+		trend = 60 * m_linear_regression.m_coefficiente_angolare /* / (.04*mean) */;
 		/*
 		
 		termo(trend, trend_CDC);
@@ -1694,7 +1691,7 @@ double CminervaRxDlg::manage_core_media(double resistance) // this is a smooth a
 	m_aux_text.Format(L"%6.5g", trend);
 	m_core_resistance_trend_C.SetWindowTextW(m_aux_text);
 
-	thermo(trend, m_p_CDC_CORE);
+	thermo(-trend, m_p_CDC_CORE);
 
 	save_core(m_seconds_continuous, mean, sigma, trend);
 
@@ -1748,18 +1745,14 @@ double CminervaRxDlg::manage_data_core(double resistance)
 	/* m_secondi_assoluti = CTime::GetCurrentTime(); */
 	m_seconds_absolute = ((double)clock() / (double)CLOCKS_PER_SEC);
 
-	if (m_seconds_t_zero != 0)
+	if (m_seconds_t_zero != 0.)
 	{
 		// m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
-		m_seconds_continuous = ((double)clock() / (double)CLOCKS_PER_SEC) - m_seconds_t_zero;/* borrowed from Gianluca's Misura. clock() returns an integer, in milliseconds*/
-		/* 
-		((double) clock() / (double) CLOCKS_PER_SEC)
-		Qui dovresti usare una funzione che restituisca il tempo con la precisione del millisecondo, non del secondo intero.
-		*/ 
+		m_seconds_continuous = m_seconds_absolute - m_seconds_t_zero;/* borrowed from Gianluca's Misura. clock() returns an integer, in milliseconds*/
 	}
 	else
 	{
-		m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
+		m_seconds_t_zero = m_seconds_absolute;
 		// m_seconds_continuous = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime();
 		// m_seconds_continuous = double(m_seconds_absolute.GetTime()) - double(m_seconds_t_zero.GetTime());
 		m_seconds_continuous = m_seconds_t_zero;
@@ -1784,7 +1777,7 @@ void CminervaRxDlg::OnBnClickedButtonProbeCurrSet2()
 
 void CminervaRxDlg::OnBnClickedButtonStartThermo()
 {
-	// TODO: Add your control notification handler code here
+	
 	UpdateData(TRUE);
 	m_do_noting = -3;
 	m_p_CDC = m_therm_color_C.GetDC();
@@ -1795,9 +1788,10 @@ void CminervaRxDlg::OnBnClickedButtonStartThermo()
 
 	k_2400_onoff(TRUE, m_adr_k2400);
 
-	if (m_seconds_t_zero != 0)
+	if (m_seconds_t_zero == 0) // If no other graph is live
+	{
 		m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
-	
+	}
 	create_empty_deltaR_thermostat_vector();
 	create_thermo_graph(); 
 	
@@ -1857,7 +1851,7 @@ BOOL CminervaRxDlg::manage_thermostat() // Drives the reading of the Thermostat 
 		openclose_switch(4, TRUE);
 		Status_7001();
 		KillTimer(3000);
-		bool esito = request_data_multi();
+		BOOL esito = request_data_multi();
 		m_ledred_termo_medium_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON2));
 		m_ledred_termo_medium_C.ShowWindow(SW_SHOW);
 		m_ledred_termo_medium_C.RedrawWindow();
@@ -1887,7 +1881,7 @@ BOOL CminervaRxDlg::manage_thermostat() // Drives the reading of the Thermostat 
 			}
 			else
 			{
-				bool esito = request_data_multi();
+				BOOL esito = request_data_multi();
 				m_ledred_termo_medium_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON2));
 				m_ledred_termo_medium_C.ShowWindow(SW_SHOW);
 				m_ledred_termo_medium_C.RedrawWindow();
@@ -2251,15 +2245,14 @@ int CminervaRxDlg::thermo(double speed, CDC * pCDC) // Color coding of the therm
 {
 	
 	double estremo = .001;
-
 	int r = max(min(255 * (speed / estremo), 255), 0);
 	int b = max(min(255 * (-speed / estremo), 255), 0);
-int g = max(min(255 - r * 10 - b * 10, 255), 0);
-CRect rectangle;
-pCDC->GetWindow()->GetClientRect(&rectangle);
-COLORREF color = RGB(r, g, b);
-//finestra->SetBkColor(colore);
-pCDC->FillSolidRect(rectangle, color);
+	int g = max(min(255 - r * 10 - b * 10, 255), 0);
+	CRect rectangle;
+	pCDC->GetWindow()->GetClientRect(&rectangle);
+	COLORREF color = RGB(r, g, b);
+	//finestra->SetBkColor(colore);
+	pCDC->FillSolidRect(rectangle, color);
 
 return 0;
 }
@@ -2542,7 +2535,7 @@ BOOL CminervaRxDlg::create_file_core()
 	{
 		//AfxMessageBox(L"Core Log File Open", MB_OK | MB_ICONINFORMATION);
 		//m_file_name_C.SetWindowText(finestra_file.GetFileName());
-		CString aux = L" Seconds\t Resist. (Ohm)\t Sigma \t Trend (K/min) \t PID freeze \n";
+		CString aux = L" Seconds \tResist. (Ohm) \tSigma \tTrend (Ohm/min) \tPID freeze \n";
 		m_file_core.WriteString(aux);
 	}
 	else
@@ -3267,7 +3260,7 @@ int CminervaRxDlg::plot_aux(double time, double delta_t)
 
 int CminervaRxDlg::plot_aux(double time, double R)
 {
-	if (m_points_vector_core<DIM_VET_CORE)
+	if (m_points_vector_aux < DIM_VET_AUX)
 	{
 		m_vector_aux[m_points_vector_aux][0] = time;
 		m_vector_aux[m_points_vector_aux][1] = R;
@@ -3444,37 +3437,44 @@ BOOL CminervaRxDlg::manage_aux()
 			if (manage_mean_aux(resistance)) // Se la media è stata correttamente effettuata con il numero di punti desiderato
 			{ // uscita dal timer "breve" e apertura di tutti i canali dello switch. Ritorno al timer "lungo". 
 				KillTimer(5000);
-				m_seconds_absolute = ((double)clock() / (double)CLOCKS_PER_SEC);
+				m_seconds_absolute = ((double) clock() / (double) CLOCKS_PER_SEC);
 				
 				double seconds; // = m_seconds_absolute.GetTime() - m_seconds_beginning_Dec_2013.GetTime(); // Quessta era la struttura in brachiterapia.
-				if (m_seconds_t_zero != 0)
+				if (m_seconds_t_zero != 0) // Check whether m_seconds_t_zero was initiated by another process in another body of the calorimeter
 				{
 					seconds = m_seconds_absolute - m_seconds_t_zero;
 				}
 				else
 				{
-					m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
+					m_seconds_t_zero = ((double) clock() / (double) CLOCKS_PER_SEC);
 					seconds = m_seconds_absolute - m_seconds_t_zero;
 				}
 
-				/*metti qui la definizione del trend ed il thermo_plot*/
+				/* metti qui la definizione del trend ed il thermo_plot */
 
-				static double old_time = 0. , old_delta_t = 0.;
-				double delta_t = (9735.5 - /*resistance*/ m_mean_resistance_aux) / (9735.5 * .04);
-				plot_aux(seconds, m_mean_resistance_aux);
+				// static double old_time = 0. , old_delta_t = 0.;
 				double speed = 0.;
-				if (old_time > 0)
-				{
-					speed = 60/*000*/ * (delta_t - old_delta_t) / (seconds - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
-					m_aux_text.Format(L"%6.3g ", speed);
+								
+				speed = 60 * (resistance - m_vector_aux[m_points_vector_aux - 1][1]) / (seconds - m_vector_aux[m_points_vector_aux - 1][0]);
+				// speed = 60 * (resistance - m_media_core[m_elements_into_mean_core - 1][1]) / (m_seconds_continuous - m_media_core[m_elements_into_mean_core - 1][0]); /* speed, in Ohm min**-1 */
+				// double delta_t = (9735.5 - /*resistance*/ m_mean_resistance_aux) / (9735.5 * .04);
+				m_aux_text.Format(L"%6.3g ", speed);
+				plot_aux(seconds, m_mean_resistance_aux);
+				m_aux_speed_C.SetWindowText(m_aux_text);
+				thermo(- speed, m_p_CDC_AUX); 
+
+				//if (old_time > 0)
+				//{
+				//	speed = 60/*000*/ * (delta_t - old_delta_t) / (seconds - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
+				//	m_aux_text.Format(L"%6.3g ", speed);
 					//termo(speed, p_termo);
-					m_aux_speed_C.SetWindowText(m_aux_text);
-					thermo(speed, m_p_CDC_AUX);
-				}
+				//	m_aux_speed_C.SetWindowText(m_aux_text);
+				//	thermo(speed, m_p_CDC_AUX);
+				// }
 				m_aux_text.Format(L"%9.9f", m_mean_resistance_aux);
 				m_aux_ohm_C.SetWindowTextW(m_aux_text);
-				old_time = seconds;
-				old_delta_t = delta_t;
+				//old_time = seconds;
+				// old_delta_t = delta_t;
 
 				save_aux(seconds, m_mean_resistance_aux, 0, speed); 
 								
