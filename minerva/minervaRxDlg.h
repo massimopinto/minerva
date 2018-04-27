@@ -12,6 +12,7 @@
 #include "C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\fit_gauss\grafico_ver2.h"
 /*Ricevuta da Stefano L. via email il 6 Aprile 2017. Caricata nel progetto 20/04/2017 sembra non introdurre nuovi errori.*/
 #include "atltime.h"
+#include "run.h"
 
 #define BDINDEX               0     // Board Index
 #define PRIMARY_ADDR_OF_DMM   3     // Primary address of device
@@ -20,20 +21,28 @@
 #define EOTMODE               1     // Enable the END message
 #define EOSMODE               1     // Disable the EOS mode
 
+
+#define TIMER_CORE 500 /* a measurement every 0.5 seconds! 1000 */
+#define TIMER_THERMOSTAT 5000   // Every 5 seconds (holding time)
+#define TIMER_AUX 10000	// Auxiliary thermistors timer interval
+#define RESISTANCE_THERMOSTAT 40000
+#define DERIVATIVE_POWER 10000 // microwatt
+
 #define GPIB0        0        
 #define TIMEOUT_POOL        10 // 10 secondi        
 #define PERIODO_LETTURA_MEDIUM 20000  //millisecondi
 #define POTENZA_DERIVATIVA 350000 // corrente derivativa iniziale = microWatt
-#define RESISTENZA_TERMOSTATO 35 // Resistenza Termostato Medium
+#define RESISTENZA_TERMOSTATO 35 // Resistenza Termostato Medium ??? 
 #define RESISTENZA_PONTE_WHEATSTONE 10000 // Resistenza Ponte Wheatstone
-#define SECONDI_SCARTO 20 // Secondi da scartare nella regressione lineare testa-coda
+#define SECONDI_SCARTO 20 // Secondi da scartare nella regressione lineare testa-coda ???
 #define DIM_VET_TERMO 1000 // Dimensione vettore dati thermostato
-#define DIM_VET_CORE 4000 // Dimensione vettore dati CORE
+#define DIM_VET_CORE 4000 // Vector data size. Since TIMER_CORE is set to 500, for the graph to show the entire past one hour you should set this size to at least (3600" / 0.57"), that is 6315 positions.
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
 
 // CminervaRxDlg dialog
 class CminervaRxDlg : public CDialogEx
 {
+	friend bool run::create_electric_run_file();
 // Construction
 public:
 	CminervaRxDlg(CWnd* pParent = NULL);	// standard constructor
@@ -398,14 +407,20 @@ public:
 	CEdit m_Pd;
 	// Polymorphic plot_thermostat function, centers the graph on the x-axis if center is set to TRUE
 	int plot_thermostat(double time, double delta_R, bool center);
-    int m_DeltaMode_Core; // 0 for OFF, 1 for ON.
+	int m_CoreHeatingMode; // 0 for Eletrical Calibration, 1 for manual heating, in an electrical calibration.
 	
 	// Combo box to swtich DeltaMode function on and off
-	CComboBox m_Combo_CoreDeltaMode_C;
-	afx_msg void OnCbnSelchangeCombo2();
+	CComboBox m_Combo_CoreHeatingMode;
+	afx_msg void OnCbnSelchangeComboHeatingMode();
 	// polymorphic K6220 configuration function with DeltaMode on or off
 	void K6220_configuration(int address, int DeltaMode);
 	// void K6220_Sweep_Configuration(int address, double microampere);
 	// Configures Delta Mode on the 6220
 	void K6220_Delta_Configuration(int address, double microampere, bool action);
+	run* my_run;
+	
+	CComboBox m_Combo_Electrical_Calibration_Time; // sets the duration of an electrical calibration cycle
+	int m_electrical_calibration_duration_option; // Holds the current selection of calibration time (corresponding to 60", 90" or 120")
+	// controls seconds set for current injection
+	CEdit m_core_set_seconds_C;
 };

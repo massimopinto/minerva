@@ -11,12 +11,6 @@
 #define new DEBUG_NEW
 #endif
 
-#define TIMER_CORE  500 /* a measurement every 0.5 seconds! 1000*/
-#define TIMER_THERMOSTAT 5000   // Every 5 seconds (holding time)
-#define TIMER_AUX 10000	// Auxiliary thermistors timer interval
-#define RESISTANCE_THERMOSTAT 40000
-#define DERIVATIVE_POWER 10000 // microwatt
-
 
 // CAboutDlg dialog used for App About
 
@@ -50,7 +44,6 @@ END_MESSAGE_MAP()
 
 
 // CminervaRxDlg dialog
-
 
 
 CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
@@ -117,10 +110,12 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, m_elements_into_average_thermospeed(0)
 	, m_seconds_continuous_thermostat(0)
 	, m_average_thermospeed(0)
-	, m_DeltaMode_Core(false)
+	, m_CoreHeatingMode(false)
+
+	, m_electrical_calibration_duration_option(0)
 {
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-	}
+}
 
 void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 {
@@ -233,7 +228,9 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_PP, m_Pp);
 	DDX_Control(pDX, IDC_EDIT_PI, m_Pi);
 	DDX_Control(pDX, IDC_EDIT_PD, m_Pd);
-	DDX_Control(pDX, IDC_COMBO2, m_Combo_CoreDeltaMode_C);
+	DDX_Control(pDX, IDC_COMBO2, m_Combo_CoreHeatingMode);
+	DDX_Control(pDX, IDC_COMBO_CALIBRATION_TIME, m_Combo_Electrical_Calibration_Time);
+	DDX_Control(pDX, IDC_EDIT2, m_core_set_seconds_C);
 }
 
 BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
@@ -286,7 +283,7 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_COMBO_CORE_THERM_ELEMENTS, &CminervaRxDlg::OnCbnSelchangeComboCoreThermElements)
 	ON_CBN_SELCHANGE(IDC_COMBO_CORE_THERM_ELEMENTS4, &CminervaRxDlg::OnCbnSelchangeComboThermospeedElements)
 	
-	ON_CBN_SELCHANGE(IDC_COMBO2, &CminervaRxDlg::OnCbnSelchangeCombo2)
+	ON_CBN_SELCHANGE(IDC_COMBO2, &CminervaRxDlg::OnCbnSelchangeComboHeatingMode)
 END_MESSAGE_MAP()
 
 
@@ -343,6 +340,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_deltaR_thermostat = NULL;
 	 m_grafico_termo = NULL;
 	 m_grafico_core = NULL;
+	 my_run = NULL;
 	 busy_7001 = _T("This is a test");
 
 	 m_seconds_beginning_Dec_2013 = CTime(2014, 07, 1, 0, 0, 0); // T_0 is July 1st, 2014, 00:00:00
@@ -356,9 +354,29 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_p_CDC = NULL;
 	 m_p_CDC_CORE = NULL;
 	 m_p_CDC_AUX = NULL;
-	 m_vector_thermo =  new (double[DIM_VET_TERMO+2][2]);;
-	 m_vector_core = new (double[DIM_VET_CORE + 2][2]);;
-	 m_vector_aux = new (double[DIM_VET_AUX + 2][2]);;
+	 m_vector_thermo =  new (double[DIM_VET_TERMO +2][2]);
+	 m_vector_core = new (double[DIM_VET_CORE + 2][2]);
+	 m_vector_aux = new (double[DIM_VET_AUX + 2][2]);
+	
+	 for (int i = 0; i < DIM_VET_CORE+2; i++) // inizializzo a zero il vettore del core
+	 {
+		 m_vector_core[i][0] = 0.0;
+		 m_vector_core[i][1] = 0.0;
+	 }
+
+	 for (int j = 0; j < DIM_VET_TERMO+2; j++) // inizializzo a zero il vettore del core
+	 {
+		 m_vector_thermo[j][0] = 0.0;
+		 m_vector_thermo[j][1] = 0.0;
+	 }
+
+	 for (int k = 0; k < DIM_VET_AUX+2; k++) // inizializzo a zero il vettore del core
+	 {
+		 m_vector_aux[k][0] = 0.0;
+		 m_vector_aux[k][1] = 0.0;
+	 }
+	 
+	 
 	 m_points_vector_thermo = 0;
 	 m_points_vector_core = 0;
 	 m_points_vector_aux = 0;
@@ -391,9 +409,14 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_combo_thermo_aux_C.SetCurSel(2);
 	 OnCbnSelchangeCombo1();
 	 
-	 m_Combo_CoreDeltaMode_C.AddString(L"OFF");
-	 m_Combo_CoreDeltaMode_C.AddString(L"ON");
-	 m_Combo_CoreDeltaMode_C.SetCurSel(1);
+	 m_Combo_CoreHeatingMode.AddString(L"Calibration OFF");
+	 m_Combo_CoreHeatingMode.AddString(L"Calibration ON");
+	 m_Combo_CoreHeatingMode.SetCurSel(0);
+
+	 m_Combo_Electrical_Calibration_Time.AddString(L"120"); 
+	 m_Combo_Electrical_Calibration_Time.AddString(L"90 ");
+	 m_Combo_Electrical_Calibration_Time.AddString(L"60 ");
+	 m_Combo_Electrical_Calibration_Time.SetCurSel(0);
 
 	 m_red_light_thermostat = 0; // no precedence to the thermostat thermistor
 	 m_status_aux = DONE;
@@ -411,7 +434,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_Pp.EnableWindow(FALSE);
 	 m_Pi.EnableWindow(FALSE);
 	 m_Pd.EnableWindow(FALSE);
-	 m_Combo_CoreDeltaMode_C.EnableWindow(FALSE);
+	 m_Combo_CoreHeatingMode.EnableWindow(TRUE);
 	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -469,23 +492,11 @@ HCURSOR CminervaRxDlg::OnQueryDragIcon()
 
 void CminervaRxDlg::OnBnClickedButtonTest()
 {
-	// TODO: Add your control notification handler code here
+	// Test functions go here
 		
-	if (!check_7001_busy())
-	{
-		m_ledred_switch_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON1));
-		m_ledred_switch_C.ShowWindow(SW_SHOW);
-		m_ledred_switch_C.RedrawWindow();
-	}
-	else
-	{
-		m_ledred_switch_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON2));
-		m_ledred_switch_C.ShowWindow(SW_SHOW);
-		m_ledred_switch_C.RedrawWindow();
-	}
-	//int esito= poll_7001();
-	// switch_open_all();
-	//Status_7001();
+	
+	my_run = new run(m_directory, DIM_VET_CORE+2, m_vector_core);
+	my_run->save_to_file();
 	return;
 	
 
@@ -1070,10 +1081,12 @@ void CminervaRxDlg::K6220_configuration(int address)
 
 void CminervaRxDlg::OnBnClickedButton2()
 {
-	// TODO: Add your control notification handler code here
+	// Starts injection of current is the heating thermistors of the core
+	// IF this is an electrical calibration, several things must be taken care of:
+	// 1) The PID is blocked (freeze on)
+	// 2) the beginning of the heating time is stored (seconds)
+	// 3) At the end of the prescribed calibration time (defaults to 120") data output is handled via  
 	UpdateData(TRUE);
-	
-	 
 
 	
 	if (m_secondi_core <= 0 || m_micro_ampere_core <= 0 || m_micro_ampere_core >500 || m_secondi_core>15000)
@@ -1082,43 +1095,14 @@ void CminervaRxDlg::OnBnClickedButton2()
 		return;
 	}
 	 
-
-	/*
-	if (m_start_togheter)
-	{
-		scrivi_GPIB(m_adr_k2400_2, testo);
-		m_corrente_jacket = m_corrente_core;
-		testo.Format("%5.5g", m_corrente_jacket);
-		m_microamp_jacket_C.SetWindowText(testo);
-		m_percento_jacket_C.GetWindowText(testo);
-		m_percento_jacket = strtod(testo, NULL);
-		if (m_percento_jacket<0 || m_percento_jacket>2)
-		{
-			AfxMessageBox("*** ERRORE NEL PARAMETRO PERCENTUALE ", MB_OK | MB_ICONSTOP);
-			return;
-		}
-
-	}
-    if (m_start_togheter)  scrivi_GPIB(m_adr_k2400_2, testo);
-	m_core_riferimento = m_core_ultima;
-	m_set_point_riferimento = m_medium_set_point;
-	*/
-
-	
-	
 	m_button_start_cycles_C.EnableWindow(FALSE);
 	 m_flag_core = 1;
-	//crea_file_ciclo();
-
-	//controllo_potenza_core();
 	 k_2400_onoff(0, m_adr_k2400_core);
 	 current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
 
 	 core_power();
 	 if (m_synchronize) OnBnClickedButtonstartjacket();
 	return;
-
-
 }
 
 
@@ -1135,6 +1119,7 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == 2001) // read core thermistor resistance
 	{
+		// read_core();
 		manage_core_measure();
 	}
 	else if (nIDEvent == 2002)
@@ -1165,8 +1150,8 @@ int CminervaRxDlg::core_power()
 	if (m_flag_core == 1)
 	{
 		SetTimer(1001, 100, NULL);
-		 m_timer_core = clock();
-		 k_2400_onoff(1, m_adr_k2400_core);
+		m_timer_core = clock();
+		k_2400_onoff(1, m_adr_k2400_core);
 		m_joule_core = 0;
 		m_flag_core = 2;
 		old_time = 0;
@@ -1187,7 +1172,6 @@ int CminervaRxDlg::core_power()
 
  if (m_flag_core == 2)
 		 {
-
 			 microjoule(micro_watt, cronometer,old_time, &m_joule_core, &m_joule_core_C);
 			 write_file_cycle(cronometer, m_joule_core, m_micro_ampere_core, volt, 0, 0, 0);
 			 old_time = cronometer;
@@ -1201,10 +1185,6 @@ int CminervaRxDlg::core_power()
 			 m_file_cycle.Close();
 			 m_button_start_cycles_C.EnableWindow(TRUE);
 		 }
-		
-		
-			
-		
 	return 0;
 }
 
@@ -1296,11 +1276,12 @@ void CminervaRxDlg::OnBnClickedButtonstartjacket()
 }
 
 
-bool CminervaRxDlg::create_cycle_file()
+bool CminervaRxDlg::create_cycle_file() // Creates a file name for output of power injection data during an electric heating run.
+// Note: This could refer to an electrical calibration, or also a manual/piloted heating done to speed up the experiment towards thermal equilibrium.
 {
 	CTime time = CTime::GetCurrentTime();
 
-	CString file_name = m_directory + time.Format("%Y_%m_%d_%H_%M_%S_cycle.dat");
+	CString file_name = m_directory + time.Format("%Y_%m_%d_%H_%M_%S_heating_cycle.dat");
 	m_file_cycle.Abort();
 	
 	BOOL esito = m_file_cycle.Open(file_name, CFile::modeCreate | CFile::modeWrite | CFile::shareDenyNone);
@@ -1336,7 +1317,7 @@ double CminervaRxDlg::write_file_cycle(long cronometer, double joule_core, doubl
 
 void CminervaRxDlg::OnBnClickedButtonRunCycle()
 {
-	// TODO: Add your control notification handler code here
+	
 	UpdateData(TRUE);
 	m_button_stop_cycle_C.EnableWindow(TRUE);
 	m_button_start_cycles_C.EnableWindow(FALSE);
@@ -1350,7 +1331,7 @@ void CminervaRxDlg::OnBnClickedButtonRunCycle()
 
 void CminervaRxDlg::OnBnClickedButtonStopCycle()
 {
-	// TODO: Add your control notification handler code here
+	
 	m_button_stop_cycle_C.EnableWindow(FALSE);
 	m_button_start_cycles_C.EnableWindow(TRUE);
 	KillTimer(1002);
@@ -1384,10 +1365,7 @@ void CminervaRxDlg::cycle_core_power()
 				control_pause();
 				m_flag_cycle_power_core = 3;
 			}
-
-
 		}
-		
 	}
 	else if (m_flag_cycle_power_core == 3)
 	{
@@ -1401,7 +1379,7 @@ void CminervaRxDlg::cycle_core_power()
 }
 
 
-// checks whether pasue time has been reached before a new cycle is launched
+// checks whether pause time has been reached before a new cycle is launched
 BOOL CminervaRxDlg::control_pause()
 {
 	int seconds = (clock() - m_pause_start) / 1000;
@@ -1589,7 +1567,7 @@ void CminervaRxDlg::OnBnClickedButtonStopCoreMeasurement2()
 	KillTimer(2002);
 	m_file_core.Close();
 
-	for (int i = 0; i < DIM_VET_CORE; i++) // Ripulisco il vettore del core coì che al prossimo riavvio dell'acquisizione dati sul core i grafici non si sovrappongano
+	for (int i = 0; i < DIM_VET_CORE; i++) // Ripulisco il vettore del core così che al prossimo riavvio dell'acquisizione dati sul core i grafici non si sovrappongano
 	{
 		m_vector_core[i][0] = 0;
 		m_vector_core[i][1] = 0;
@@ -2559,7 +2537,7 @@ bool CminervaRxDlg::save_core(double seconds, double resistance, double sigma, d
 		m_file_core.WriteString(aux);
 	}
 
-		double delta_t = (10025. - resistance) / (10025. *.04);
+		// double delta_t = (10025. - resistance) / (10025. *.04);
 		// plot_core(seconds, resistance);
 		plot_R(seconds, resistance);
 
@@ -3158,25 +3136,8 @@ bool CminervaRxDlg::save_aux(long seconds, double resistance, double sigma, doub
 		m_file_aux.WriteString(aux);
 	}
 
-	// spostato tutto in manage_aux
-	// double delta_t = (m_set_point - resistance) / (m_set_point*.04);
-	// plot_aux(seconds, delta_t);
-	
-	// if (old_time > 0)
-	//{
-	//double speed = 60/*000*/ * (delta_t - old_delta_t) / (seconds - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
-	//m_aux_text.Format(L"%6.3g ", speed);
-	//termo(speed, p_termo);
-	//m_aux_speed_C.SetWindowText(m_aux_text);
-	//thermo(speed, m_p_CDC_AUX);
-	//}
-
-	//old_time = seconds;
-	//old_delta_t = delta_t; 
-	
 	return false;
 }
-
 
 BOOL CminervaRxDlg::create_file_aux()
 {
@@ -3192,7 +3153,7 @@ BOOL CminervaRxDlg::create_file_aux()
 	{
 		//AfxMessageBox(L"Core Log File Open", MB_OK | MB_ICONINFORMATION);
 		//m_file_name_C.SetWindowText(finestra_file.GetFileName());
-		CString aux = L" Seconds\t Resistance(Ohm)\t Sigma \t Trend (K/min) \n";
+		CString aux = L" Seconds \tResistance(Ohm) \tSigma \tTrend (Ohm/min) \n";
 		m_file_aux.WriteString(aux);
 	}
 	else
@@ -4258,18 +4219,45 @@ void CminervaRxDlg::PID_2017(double resistance, double error, double speed)
 }
 
 
-void CminervaRxDlg::OnCbnSelchangeCombo2() /* Selects delta mode on or off on the Core Wheatston Bridge */
+void CminervaRxDlg::OnCbnSelchangeComboHeatingMode() /* Selects Electrical Calibration OFF or ON and handles all corresponding events */
 {
 	CString text;
-	int pos = m_Combo_CoreDeltaMode_C.GetCurSel();
-	m_Combo_CoreDeltaMode_C.GetLBText(pos, text);
-	// m_graph_radio_C.SetWindowTextW(text);
+	int pos = m_Combo_CoreHeatingMode.GetCurSel();
+	m_Combo_CoreHeatingMode.GetLBText(pos, text);
 	if (pos < 2)
 	{
-		m_DeltaMode_Core = pos;
+		m_CoreHeatingMode = pos;
 	}
-	K6220_configuration(m_adr_k6220_core, m_DeltaMode_Core); /*re-configures the K6220 on the Core Wheatson Bridge accordingly.*/
-	K2182_configuration(m_adr_k2182_core, m_DeltaMode_Core); /*re-configures the K2182 on the Core Wheatson Bridge accordingly.*/
+	if (m_CoreHeatingMode == 0) // Electrical Calibration OFF: no output file creation, PID operation normal.
+	{
+		m_synchronize = FALSE;
+		m_thermo_freeze = FALSE;
+		m_core_set_seconds_C.EnableWindow(TRUE);
+		UpdateData(FALSE);
+	}
+	else if (m_CoreHeatingMode == 1) // Electrical Calibration ON. PID Frozen, calibration run outputed to a file, Timer set for the entire run and for the following 180" to follow the post-run drift. 
+	{
+		// UpdateData(FALSE);
+		m_synchronize = TRUE;
+		// m_thermo_freeze = TRUE; NO: this needs to be set only when the actual injection begins, otherwise you lose the control of the PID. These are just settings here.
+		UpdateData(FALSE);
+		CString cal_time;
+		int pos_duration = m_Combo_Electrical_Calibration_Time.GetCurSel();
+		m_Combo_Electrical_Calibration_Time.GetLBText(pos_duration, cal_time);
+		/*int cal_time = 0;
+		if (pos_duration == 0) cal_time = 120;
+		else if (pos_duration == 1) cal_time = 90;
+		else if (pos_duration == 2) cal_time = 60;
+		else cal_time = 0;
+		*/
+		// m_secondi_core = cal_time;
+		// text.Format(L"%6.2f", cal_time);
+		m_core_set_seconds_C.SetWindowTextW(cal_time);
+		m_core_set_seconds_C.EnableWindow(FALSE);
+		// UpdateData(TRUE);
+			
+	}
+	// UpdateData(FALSE);
 }
 
 
@@ -4383,7 +4371,7 @@ void CminervaRxDlg::K6220_configuration(int address, int DeltaMode)
 	return;
 }
 
-// Configures Delta Mode on the 6220
+// Configures Delta Mode on the 6220 (Obsolete, consider deletion) 
 void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, bool action)
 {
 	UpdateData(TRUE);
