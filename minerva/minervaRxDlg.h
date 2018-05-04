@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "NIDAQmx.h"
 #include "ni4882.h"
 #include "afxwin.h"
 #include "afx.h"
@@ -65,6 +66,18 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
+	// VARIABILI GESTIONE OTTURATORE STANZA 10 RX ME
+	TaskHandle taskHandleAPRI;			/* ID del task che verrà assegnato da DAQmxCreateTask */
+	TaskHandle taskHandleCHIUDI;			/* ID del task che verrà assegnato da DAQmxCreateTask */
+	char* outputAPRI;			/* L'output analogico usato per il tasto APRI è AO0*/
+	char* outputCHIUDI;		/* L'output analogico usato per il tasto CHIUDI è AO1*/
+	char* nomeTaskAPRI;			/* Nome del task */
+	char* nomeTaskCHIUDI;		/* Nome del task */
+	float64 minVal;
+	float64 maxVal;				/* L'output è condizionato al range 0..5V */
+	int32 configInput;		/* L'uscita è configurata come  come single-ended */
+	int32 totale;
+	// FINE VARIABILI GESTIONE OTTURATORE STANZA 10 RX ME
 	afx_msg void OnBnClickedButtonTest();
 	BOOL inizializza_GPIB();
 	bool assign_GPIBaddress();
@@ -102,6 +115,14 @@ public:
 	void K6220_configuration(int address);
 	int m_adr_k6220_multi;
 	int m_adr_k7001_switch;
+	
+	// catena di misura stanza 10, ed. T-5 (elett+par. ambientali) /* 02/05/2018*/
+	int m_adr_k617_monitor;
+	int m_adr_druck;
+	int m_adr_thermo_HP;
+	int m_adr_k199;
+	// catena di misura stanza 10, ed. T-5 (elett+par. ambientali)
+
 	int m_micro_ampere_core;
 	int m_secondi_core;
 	CEdit m_microwatt_core_C;
@@ -423,4 +444,30 @@ public:
 	int m_electrical_calibration_duration_option; // Holds the current selection of calibration time (corresponding to 60", 90" or 120")
 	// controls seconds set for current injection
 	CEdit m_core_set_seconds_C;
+	CButton m_Stop_Core_current_injection_C;
+	CButton m_Stop_Jacket_current_injection_C;
+	BOOL K617_configuration(int address);
+	BOOL HP_thermometer_configuration(int address);
+	BOOL K199_configuration(int address);
+	CComboBox capacitor_number;
+	CEdit capacitor_value_text;
+	double capacitor_value_numeric;
+	void populate_capacitor_list();
+	afx_msg void OnCbnSelchangeComboCapacitor();
+	afx_msg void OnBnClickedButtonIrradiate();
+	CComboBox m_Combo_Irradiation_Time;
+	afx_msg void OnCbnSelchangeComboIrradiationTime();
+	CButton m_button_irradiate;
+	long m_irradiation_time_left;
+	double irradiation_begins_now;
+	double irradiation_ends_now;
+	int m_ShutterWait;
+	BOOL m_partial_GPIB_configuration;
+	bool extend_GPIBNetwork();
+	int extended_check_instruments();
+	int extended_instruments_configuration();
+	
+	// // CHECK control to extend the GPIB configuration to include the monitor chamber electrometer etc.
+	CButton m_enable_extended_GPIB_C;
+	afx_msg void OnBnClickedCheckEnableExtendedGPIB();
 };

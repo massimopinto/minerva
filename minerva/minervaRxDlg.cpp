@@ -6,6 +6,7 @@
 #include "minervaRx.h"
 #include "minervaRxDlg.h"
 #include "afxdialogex.h"
+#include <stdlib.h> 
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -113,6 +114,9 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, m_CoreHeatingMode(false)
 
 	, m_electrical_calibration_duration_option(0)
+	, capacitor_value_numeric(0)
+	, m_irradiation_time_left(0)
+	, m_partial_GPIB_configuration(TRUE)
 {
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -231,6 +235,14 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO2, m_Combo_CoreHeatingMode);
 	DDX_Control(pDX, IDC_COMBO_CALIBRATION_TIME, m_Combo_Electrical_Calibration_Time);
 	DDX_Control(pDX, IDC_EDIT2, m_core_set_seconds_C);
+	DDX_Control(pDX, IDC_BUTTON_STOP_Core_calibration, m_Stop_Core_current_injection_C);
+	DDX_Control(pDX, IDC_BUTTON_STOP_Jacket_calibration2, m_Stop_Jacket_current_injection_C);
+	DDX_Control(pDX, IDC_COMBO_CAPACITOR, capacitor_number);
+	DDX_Control(pDX, IDC_EDIT33, capacitor_value_text);
+	DDX_Control(pDX, IDC_COMBO_IRRADIATION_TIME, m_Combo_Irradiation_Time);
+	DDX_Control(pDX, IDC_BUTTON_IRRADIATE, m_button_irradiate);
+	DDX_Text(pDX, IDC_EDIT_TIME_LEFT_IRRADIATION, m_irradiation_time_left);
+	DDX_Control(pDX, IDC__GPIB_EXTENSION, m_enable_extended_GPIB_C);
 }
 
 BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
@@ -284,6 +296,10 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_COMBO_CORE_THERM_ELEMENTS4, &CminervaRxDlg::OnCbnSelchangeComboThermospeedElements)
 	
 	ON_CBN_SELCHANGE(IDC_COMBO2, &CminervaRxDlg::OnCbnSelchangeComboHeatingMode)
+	ON_CBN_SELCHANGE(IDC_COMBO_CAPACITOR, &CminervaRxDlg::OnCbnSelchangeComboCapacitor)
+	ON_BN_CLICKED(IDC_BUTTON_IRRADIATE, &CminervaRxDlg::OnBnClickedButtonIrradiate)
+	ON_CBN_SELCHANGE(IDC_COMBO_IRRADIATION_TIME, &CminervaRxDlg::OnCbnSelchangeComboIrradiationTime)
+	ON_BN_CLICKED(IDC__GPIB_EXTENSION, &CminervaRxDlg::OnBnClickedCheckEnableExtendedGPIB)
 END_MESSAGE_MAP()
 
 
@@ -319,13 +335,28 @@ BOOL CminervaRxDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
+	
+	int i = MessageBox(L"Do you want to extend the GPIB configuration for Rx Irradiation Mode?\nThis includes connecting to the monitor chamber electrometer, thermometer, barometer, hygrometer, and shutter.", L"GPIB configuration", MB_YESNO);
+	if (i == IDNO) m_partial_GPIB_configuration = TRUE;
+	else
+	{
+		m_partial_GPIB_configuration = FALSE;
+		//UpdateData(FALSE);
+	}
 	m_string = new char[200];
-//	 if (inizializza_GPIB())
-		{
-			assign_GPIBaddress();
-			check_instruments();
-			instruments_configuration();
-		}
+	
+	// Default configuration withOUT Monitor chamber electrometer etc.
+	assign_GPIBaddress();
+	check_instruments();
+	instruments_configuration();
+		
+	if (!m_partial_GPIB_configuration)
+	{
+		extend_GPIBNetwork();
+		extended_check_instruments();
+		extended_instruments_configuration();
+	}
+
 	 m_directory = L"\\Users\\CalRx\\Documents\\Minerva_runs\\"; 
 	 m_ETA_target = 15; // desired minutes to setpoint
 	 m_set_point=10500; // Ohm
@@ -408,6 +439,8 @@ BOOL CminervaRxDlg::OnInitDialog()
 	
 	 m_combo_thermo_aux_C.SetCurSel(2);
 	 OnCbnSelchangeCombo1();
+
+	 populate_capacitor_list();
 	 
 	 m_Combo_CoreHeatingMode.AddString(L"Calibration OFF");
 	 m_Combo_CoreHeatingMode.AddString(L"Calibration ON");
@@ -417,6 +450,14 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_Combo_Electrical_Calibration_Time.AddString(L"90 ");
 	 m_Combo_Electrical_Calibration_Time.AddString(L"60 ");
 	 m_Combo_Electrical_Calibration_Time.SetCurSel(0);
+
+	 m_Combo_Irradiation_Time.AddString(L"120");
+	 m_Combo_Irradiation_Time.AddString(L"90 ");
+	 m_Combo_Irradiation_Time.AddString(L"60 ");
+	 m_Combo_Irradiation_Time.AddString(L"5 ");
+	 m_Combo_Irradiation_Time.SetCurSel(0);
+
+	 m_irradiation_time_left = 120;
 
 	 m_red_light_thermostat = 0; // no precedence to the thermostat thermistor
 	 m_status_aux = DONE;
@@ -430,11 +471,50 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_core_stop_button_C.EnableWindow(FALSE);
 	 m_thermo_stop_button_C.EnableWindow(FALSE);
 	 m_Okay_button_C.EnableWindow(FALSE);
+	 m_Stop_Core_current_injection_C.EnableWindow(FALSE);
+	 m_Stop_Jacket_current_injection_C.EnableWindow(FALSE);
 
 	 m_Pp.EnableWindow(FALSE);
 	 m_Pi.EnableWindow(FALSE);
 	 m_Pd.EnableWindow(FALSE);
 	 m_Combo_CoreHeatingMode.EnableWindow(TRUE);
+
+	 if (m_partial_GPIB_configuration) // GPIB network is limited
+	 {
+		 m_button_irradiate.EnableWindow(FALSE);
+		 m_enable_extended_GPIB_C.EnableWindow(TRUE);
+	 }
+	 else // GPIB network is extended to the monitor chamber electrometer, thermometer, barometer...
+	 {
+		 m_enable_extended_GPIB_C.EnableWindow(FALSE);
+		 m_enable_extended_GPIB_C.SetCheck(1);
+	 }
+		
+
+	 populate_capacitor_list();
+
+	 taskHandleAPRI = 0;			/* ID del task che verrà assegnato da DAQmxCreateTask */
+	 taskHandleCHIUDI = 0;			/* ID del task che verrà assegnato da DAQmxCreateTask */
+	 outputAPRI = "dev1/ao0";			/* L'output analogico usato per il tasto APRI è AO0*/
+	 outputCHIUDI = "dev1/ao1";		/* L'output analogico usato per il tasto CHIUDI è AO1*/
+	 nomeTaskAPRI = "TaskAO0";			/* Nome del task */
+	 nomeTaskCHIUDI = "TaskAO1";		/* Nome del task */
+	 minVal = 0, maxVal = 5;				/* L'output è condizionato al range 0..5V */
+	 configInput = DAQmx_Val_RSE;		/* L'uscita è configurata come  come single-ended */
+	 totale = 0;
+
+	 /* CREAZIONE DEL TASK                        */
+	 DAQmxCreateTask(nomeTaskAPRI, &taskHandleAPRI);
+	 DAQmxCreateTask(nomeTaskCHIUDI, &taskHandleCHIUDI);
+
+	 /* CONFIGURAZIONE DEL TASK                   */
+	 DAQmxCreateAOVoltageChan(taskHandleAPRI, outputAPRI, "", minVal, maxVal, DAQmx_Val_Volts, NULL);
+	 DAQmxCreateAOVoltageChan(taskHandleCHIUDI, outputCHIUDI, "", minVal, maxVal, DAQmx_Val_Volts, NULL);
+
+	 /* AVVIO DEL TASK                            */
+	 DAQmxStartTask(taskHandleAPRI);
+	 DAQmxStartTask(taskHandleCHIUDI);
+
 	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -545,7 +625,7 @@ BOOL CminervaRxDlg::inizializza_GPIB()
 
 bool CminervaRxDlg::assign_GPIBaddress()
 {
-	m_adr_k7001_switch = assign_device(20);
+	m_adr_k7001_switch = assign_device(19); // vecchio valore indirizzo GPIB 20
 	m_adr_k2400 = assign_device(22);
 	m_adr_k2400_core = assign_device(23);
 	m_adr_k2400_jacket = assign_device(24);
@@ -555,7 +635,9 @@ bool CminervaRxDlg::assign_GPIBaddress()
 	m_adr_k6220_core = assign_device(11);
 	m_adr_k6220_multi = assign_device(12);
 
-		return false;
+
+
+	return false;
 }
 
 
@@ -684,6 +766,9 @@ int CminervaRxDlg::check_instruments()
 		add_message(testo);
 		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
 	}
+
+	
+	
 	;
 	return 0;
 }
@@ -1088,7 +1173,7 @@ void CminervaRxDlg::OnBnClickedButton2()
 	// 3) At the end of the prescribed calibration time (defaults to 120") data output is handled via  
 	UpdateData(TRUE);
 
-	
+	m_Stop_Core_current_injection_C.EnableWindow(TRUE);
 	if (m_secondi_core <= 0 || m_micro_ampere_core <= 0 || m_micro_ampere_core >500 || m_secondi_core>15000)
 	{
 		AfxMessageBox(L"*** ERRORE NEI PARAMETRI IMPOSTATI", MB_OK | MB_ICONSTOP);
@@ -1101,6 +1186,8 @@ void CminervaRxDlg::OnBnClickedButton2()
 	 current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
 
 	 core_power();
+	 
+
 	 if (m_synchronize) OnBnClickedButtonstartjacket();
 	return;
 }
@@ -1138,6 +1225,98 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 		manage_aux();
 	}
+	else if (nIDEvent == 6000) // irradiation
+	{
+		if (m_irradiation_time_left > 1)
+		{
+			--m_irradiation_time_left;
+			UpdateData(FALSE);
+		}
+		else
+		{
+		
+			KillTimer(6000);
+			// Shutter closure operations begin
+			float64 value = 4;
+			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+			DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, 0.0, NULL);
+
+			// imposto timer di 0.1 s con passo da 0.01 s per finalizzazione apertura otturatore:
+			m_ShutterWait = 11;
+			SetTimer(6002, 10, NULL);
+			// Shutter closure operations end
+
+			OnCbnSelchangeComboIrradiationTime();
+			m_button_irradiate.SetWindowTextW(L"Irradiate");
+			m_Combo_Irradiation_Time.EnableWindow(TRUE);
+			m_thermo_freeze = FALSE; // PID freeze
+			UpdateData(FALSE);
+
+			
+		}
+	
+	}
+	else if (nIDEvent == 6001) // TIMER PER 'APERTURA OTTURATORE' AUTOMATIZZATA NEL CASO RX M.E.
+	{
+		m_ShutterWait = m_ShutterWait - 1;
+
+		if (m_ShutterWait <= 0)
+		{
+			KillTimer(6001);
+
+			float64 value = 0.0;
+			DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+		}
+	}
+	else if (nIDEvent == 6002) // TIMER PER 'CHIUSURA OTTURATORE' AUTOMATIZZATA NEL CASO RX M.E.
+	{
+		m_ShutterWait = m_ShutterWait - 1;
+
+		if (m_ShutterWait <= 0)
+		{
+			KillTimer(6002);
+
+			float64 value = 0.0;
+			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+
+			CString text;
+			//if (!srq()) // gestione srq 
+			{
+				
+				irradiation_ends_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
+				//  mettere in modalità misura OFF elettrometro monitor (dare il GET per la memorizzazione valore finale)
+				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+				
+				text = L"GET";  // 
+				write_GPIB(m_adr_k617_monitor, text);
+
+				//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
+				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+				irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+			}
+
+			text = L"B1G1X";
+			write_GPIB(m_adr_k617_monitor, text); // comando di lettura del buffer + misure senza prefisso
+
+			int status, l;
+			
+			//char rm[5000];				 // stringhe per scaricare buffer sia dell'elettrometro (per ora non la uso...)
+			CString rMString;  // per scaricare buffer dell'elettrometro collegato al monitor (M)
+
+			read_GPIB(m_adr_k617_monitor, &rMString);
+			MessageBox(L"Buffer =" + rMString);
+
+			text = L"B1G1X";
+			write_GPIB(m_adr_k617_monitor, text); // comando di lettura del buffer + misure senza prefisso
+
+	
+			read_GPIB(m_adr_k617_monitor, &rMString);
+			MessageBox(L"Buffer =" + rMString);
+		}
+	}
+
 	CDialogEx::OnTimer(nIDEvent);
 }
 
@@ -4396,4 +4575,292 @@ void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, b
 		text = L"SOURce:SWEep:ABORt"; /*unArms DELTA*/
 		write_GPIB(address, text);
 		}
+}
+
+
+BOOL CminervaRxDlg::K617_configuration(int address)
+{
+	CString text;
+	text = L"C1Z0XF4R3XQ0X";
+	write_GPIB(address, text); // zero check ON, correct OFF, modalità controreazione, buffer ON e range fisso a 20 V
+
+	text = L"M1T3X"; // abilito SRQ per la condizione di overflow e one-shot trigger by GET	
+	write_GPIB(address, text);
+
+	return 1;
+}
+
+
+BOOL CminervaRxDlg::HP_thermometer_configuration(int address)
+{
+	CString text;
+	text = L"R1X";
+	write_GPIB(address, text); // Range 1 (?...)
+	text = L"T2X";
+	write_GPIB(address, text); // Termistore n. 2 sul monitor (?...)
+	return 1;
+}
+
+
+BOOL CminervaRxDlg::K199_configuration(int address)
+{
+	CString text;
+	text = L"F0R0S1P0X";
+	write_GPIB(address, text); 
+
+	text = L"O0Q0W0N1X";
+	write_GPIB(address, text);
+
+	return 1;
+}
+
+
+void CminervaRxDlg::populate_capacitor_list()
+{
+	capacitor_number.ResetContent();
+	CString tmp;
+	for (int i = 1; i <= 26; i++)
+	{
+		tmp.Format(L"%d", i);
+		capacitor_number.AddString(tmp);
+	}
+
+	for (int i = 101; i <= 107; i++)
+	{
+		tmp.Format(L"%d", i);
+		capacitor_number.AddString(tmp);
+	}
+
+	for (int i = 201; i <= 207; i++)
+	{
+		tmp.Format(L"%d", i);
+		capacitor_number.AddString(tmp);
+	}
+
+
+	capacitor_number.SetCurSel(0);
+	OnCbnSelchangeComboCapacitor();
+}
+
+
+void CminervaRxDlg::OnCbnSelchangeComboCapacitor()
+{
+	/* 
+	Per iniziare, abbiamo scelto di non avvalerci della connessione al DBase Misura, già di riferimento per il software di gestione misure ionometriche.
+	Non è però escluso che si faccia uso dei dBase in futuro anche per organizzare le misure di calorimetria.
+	 */ 
+	int i = capacitor_number.GetCurSel();
+	switch (i)
+	{
+	case 0:  this->capacitor_value_text.SetWindowTextW(L"999.4"); break;
+	case 1:  this->capacitor_value_text.SetWindowTextW(L"996.85"); break;
+	case 2:  this->capacitor_value_text.SetWindowTextW(L"1012.2"); break;
+	case 3:  this->capacitor_value_text.SetWindowTextW(L"1000.5"); break;
+	case 4:  this->capacitor_value_text.SetWindowTextW(L"5013.5"); break;
+	case 5:  this->capacitor_value_text.SetWindowTextW(L"5022.7"); break;
+	case 6:  this->capacitor_value_text.SetWindowTextW(L"100.22"); break;
+	case 7:  this->capacitor_value_text.SetWindowTextW(L"100.19"); break;
+	case 8:  this->capacitor_value_text.SetWindowTextW(L"10030"); break;
+	case 9:  this->capacitor_value_text.SetWindowTextW(L"29918"); break;
+	case 10:  this->capacitor_value_text.SetWindowTextW(L"100510"); break;
+	case 11:  this->capacitor_value_text.SetWindowTextW(L"100058"); break;
+	case 12:  this->capacitor_value_text.SetWindowTextW(L"100604"); break;
+	case 13:  this->capacitor_value_text.SetWindowTextW(L"59644"); break;
+	case 14:  this->capacitor_value_text.SetWindowTextW(L"40015.8"); break;
+	case 15:  this->capacitor_value_text.SetWindowTextW(L"29997"); break;
+	case 16:  this->capacitor_value_text.SetWindowTextW(L"9976.8"); break;
+	case 17:  this->capacitor_value_text.SetWindowTextW(L"10045.2"); break;
+	case 18:  this->capacitor_value_text.SetWindowTextW(L"5009.91"); break;
+	case 19:  this->capacitor_value_text.SetWindowTextW(L"5016.86"); break;
+	case 20:  this->capacitor_value_text.SetWindowTextW(L"1002.22"); break;
+	case 21:  this->capacitor_value_text.SetWindowTextW(L"1000.78"); break;
+	case 22:  this->capacitor_value_text.SetWindowTextW(L"503.755"); break;
+	case 23:  this->capacitor_value_text.SetWindowTextW(L"504.156"); break;
+	case 24:  this->capacitor_value_text.SetWindowTextW(L"182490"); break;
+	case 25:  this->capacitor_value_text.SetWindowTextW(L"364220"); break;
+	case 26:  this->capacitor_value_text.SetWindowTextW(L"100.356"); break;
+	case 27:  this->capacitor_value_text.SetWindowTextW(L"1002.23"); break;
+	case 28:  this->capacitor_value_text.SetWindowTextW(L"5007"); break;
+	case 29:  this->capacitor_value_text.SetWindowTextW(L"10017"); break;
+	case 30:  this->capacitor_value_text.SetWindowTextW(L"30082"); break;
+	case 31:  this->capacitor_value_text.SetWindowTextW(L"59756"); break;
+	case 32:  this->capacitor_value_text.SetWindowTextW(L"99704"); break;
+	case 33:  this->capacitor_value_text.SetWindowTextW(L"100.047"); break;
+	case 34:  this->capacitor_value_text.SetWindowTextW(L"1001.39"); break;
+	case 35:  this->capacitor_value_text.SetWindowTextW(L"5025"); break;
+	case 36:  this->capacitor_value_text.SetWindowTextW(L"10065"); break;
+	case 37:  this->capacitor_value_text.SetWindowTextW(L"30046"); break;
+	case 38:  this->capacitor_value_text.SetWindowTextW(L"59949"); break;
+	case 39:  this->capacitor_value_text.SetWindowTextW(L"100440"); break;
+	}
+}
+
+void CminervaRxDlg::OnBnClickedButtonIrradiate()
+{
+	// Sequence of events that characterize a radiation run
+	CString txt;
+	m_button_irradiate.GetWindowTextW(txt);
+	if (txt == L"Irradiate")
+	{
+		UpdateData(TRUE);
+		CString tmp, tmp2;
+		tmp = L"Are you sure your rx tube is on and stable? And are you sure your choices are: \nirradiation time = ";
+		m_Combo_Irradiation_Time.GetLBText(m_Combo_Irradiation_Time.GetCurSel(), tmp2);
+		tmp += tmp2 + L" /s";
+		tmp += L"\ncapacitor = ";
+		capacitor_value_text.GetWindowTextW(tmp2);
+		tmp += tmp2 + L" /pF ?\n";
+		
+		int i = MessageBox(tmp, L"Irradiation...", MB_YESNO | MB_ICONEXCLAMATION);
+		
+		if (i == IDYES)
+		{
+
+			txt = L"Abort Irradiation";
+			m_button_irradiate.SetWindowTextW(txt);
+
+			m_thermo_freeze = TRUE; // PID freeze
+			UpdateData(FALSE);
+			m_Combo_Irradiation_Time.EnableWindow(FALSE);
+
+			CString text;
+			text = L"Z1C0X";  // zero correct ON and zero check OFF (electrometer measurement)
+			write_GPIB(m_adr_k617_monitor, text); 
+			
+			//if (!srq()) // gestione srq 
+			{
+				irradiation_begins_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
+				text = L"GET";  // 
+				write_GPIB(m_adr_k617_monitor, text);
+				
+				//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
+				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+				irradiation_begins_now = 0.5* (irradiation_begins_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+			}
+			
+			
+			float64 value = 4;
+			DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, 0.0, NULL);
+
+			// imposto timer di 0.1 s con passo da 0.01 s per finalizzazione apertura otturatore:
+			m_ShutterWait = 11;
+			SetTimer(6001, 10, NULL);
+
+			
+
+			SetTimer(6000, 1000, NULL);
+
+			/*
+			- aprire lo shutter (il tubo deve già essere stato acceso e scelta la capacità usata per la misura ionometrica col monitor)
+			- partire con un timer di misura da 120 s con passo 120000 ms, allo scadere del quale:
+			- chiudere lo shutter ed ordinare il GET per la memorizzazione finale del valore misurato col monitor
+			- rimettere a OFF il PID freez settando come nuovo valore di setpoint l'ultimo valore di resistence sullo shield a fine irraggiamento
+			- partire con un timer da 180 sec con passo 180000 ms (al termine del quale istanziare oggetto della classe Run, che gestirà la scrittura dei dati in un file dedicato)
+			*/
+		}
+	}
+	else // Abort Irradiation Instructions 
+	{
+		
+		
+		txt = L"Irradiate";
+		m_button_irradiate.SetWindowTextW(txt);
+
+		m_thermo_freeze = FALSE; // PID freeze
+		UpdateData(FALSE);
+
+		m_Combo_Irradiation_Time.EnableWindow(TRUE);
+		KillTimer(6000);
+		OnCbnSelchangeComboIrradiationTime();
+
+		float64 value = 4;
+		DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+		DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, 0.0, NULL);
+
+		// imposto timer di 0.1 s con passo da 0.01 s per finalizzazione apertura otturatore:
+		m_ShutterWait = 11;
+		SetTimer(6002, 10, NULL);
+
+	}
+}
+
+
+void CminervaRxDlg::OnCbnSelchangeComboIrradiationTime()
+{
+	// TODO: Add your control notification handler code here
+	CString txt;
+	m_Combo_Irradiation_Time.GetLBText(m_Combo_Irradiation_Time.GetCurSel(), txt);
+	m_irradiation_time_left = (long)wcstod(txt, NULL);
+	UpdateData(FALSE);
+}
+
+
+bool CminervaRxDlg::extend_GPIBNetwork()
+{
+	// catena di misura stanza 10, ed. T-5 (elett+par. ambientali)
+	m_adr_k617_monitor = assign_device(27);
+	m_adr_druck = assign_device(20);
+	m_adr_thermo_HP = assign_device(13);
+	m_adr_k199 = assign_device(26);
+	// catena di misura stanza 10, ed. T-5 (elett+par. ambientali)
+	return false;
+}
+
+
+int CminervaRxDlg::extended_check_instruments()
+{
+	CString testo;
+	// catena di misura st.za 10
+	if (!poll(m_adr_k199))
+	{
+		testo = "Please Check K199 Address 26";
+		add_message(testo);
+		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
+	}
+
+	if (!poll(this->m_adr_druck))
+	{
+		testo = "Please Check Druck DPI-141 Barometer Address 20";
+		add_message(testo);
+		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
+	}
+
+	if (!poll(this->m_adr_k617_monitor))
+	{
+		testo = "Please Check Keithkley 617 Address 27";
+		add_message(testo);
+		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
+	}
+
+	if (!poll(this->m_adr_thermo_HP))
+	{
+		testo = "Please Check HP Thermometer Address 13";
+		add_message(testo);
+		AfxMessageBox(testo, MB_ICONEXCLAMATION | MB_OK);
+	}
+	return 0;
+}
+
+
+int CminervaRxDlg::extended_instruments_configuration()
+{
+	K617_configuration(m_adr_k617_monitor);
+	HP_thermometer_configuration(m_adr_thermo_HP);
+	K199_configuration(m_adr_k199);
+	return 0;
+}
+
+
+void CminervaRxDlg::OnBnClickedCheckEnableExtendedGPIB()
+{
+	// TODO: Add your control notification handler code here
+
+	m_enable_extended_GPIB_C.EnableWindow(FALSE);
+	m_partial_GPIB_configuration = FALSE;
+	m_button_irradiate.EnableWindow(TRUE);
+	extend_GPIBNetwork();
+	extended_check_instruments();
+	extended_instruments_configuration();
 }
