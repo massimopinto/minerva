@@ -23,7 +23,7 @@ public:
 	/* questo costruttore instanzia l'oggetto di tipo run specificando anzitutto la directory dove andrà a salvare il file testo
 	   con i dati acquisiti (primo argomento), il vettore generale di grossa dimensione dove sono memorizzati i dati acquisiti del core
 	   (quarto argomento), la dimensione di quest'ultimo vettore (secondo argomento), l'indice corrispondente all'istante di START del run del core (terzo argomento) */
-	run(CString directory = L".", int dim = 0, double vector[][2] = NULL);
+	run(CString directory = L".", int last_index = 0, double (* vector)[2] = NULL, BOOL electric = FALSE);
 	~run();
 
 protected:

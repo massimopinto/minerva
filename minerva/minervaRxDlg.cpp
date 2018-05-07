@@ -7,6 +7,7 @@
 #include "minervaRxDlg.h"
 #include "afxdialogex.h"
 #include <stdlib.h> 
+#include <math.h> 
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -115,8 +116,12 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 
 	, m_electrical_calibration_duration_option(0)
 	, capacitor_value_numeric(0)
-	, m_irradiation_time_left(0)
+	, m_run_countdown(0)
 	, m_partial_GPIB_configuration(TRUE)
+	, VMbegin(0)
+	, attenuation_coeff(0)
+	, QMON(0)
+	, IMON(0)
 {
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -241,8 +246,9 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT33, capacitor_value_text);
 	DDX_Control(pDX, IDC_COMBO_IRRADIATION_TIME, m_Combo_Irradiation_Time);
 	DDX_Control(pDX, IDC_BUTTON_IRRADIATE, m_button_irradiate);
-	DDX_Text(pDX, IDC_EDIT_TIME_LEFT_IRRADIATION, m_irradiation_time_left);
+	DDX_Text(pDX, IDC_EDIT_TIME_LEFT_IRRADIATION, m_run_countdown);
 	DDX_Control(pDX, IDC__GPIB_EXTENSION, m_enable_extended_GPIB_C);
+	DDX_Control(pDX, IDC_COMBO_RADIATION_QUALITY, m_combo_radiation_quality);
 }
 
 BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
@@ -300,6 +306,7 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_IRRADIATE, &CminervaRxDlg::OnBnClickedButtonIrradiate)
 	ON_CBN_SELCHANGE(IDC_COMBO_IRRADIATION_TIME, &CminervaRxDlg::OnCbnSelchangeComboIrradiationTime)
 	ON_BN_CLICKED(IDC__GPIB_EXTENSION, &CminervaRxDlg::OnBnClickedCheckEnableExtendedGPIB)
+	ON_CBN_SELCHANGE(IDC_COMBO_RADIATION_QUALITY, &CminervaRxDlg::OnCbnSelchangeComboRadiationQuality)
 END_MESSAGE_MAP()
 
 
@@ -457,7 +464,14 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_Combo_Irradiation_Time.AddString(L"5 ");
 	 m_Combo_Irradiation_Time.SetCurSel(0);
 
-	 m_irradiation_time_left = 120;
+	 attenuation_coeff = 0.259;
+	 m_combo_radiation_quality.AddString(L"CCRI-100");
+	 m_combo_radiation_quality.AddString(L"CCRI-135"); 
+	 m_combo_radiation_quality.AddString(L"CCRI-180"); 
+	 m_combo_radiation_quality.AddString(L"CCRI-280");
+	 m_combo_radiation_quality.SetCurSel(0);
+
+	 m_run_countdown = 120;
 
 	 m_red_light_thermostat = 0; // no precedence to the thermostat thermistor
 	 m_status_aux = DONE;
@@ -514,6 +528,8 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 /* AVVIO DEL TASK                            */
 	 DAQmxStartTask(taskHandleAPRI);
 	 DAQmxStartTask(taskHandleCHIUDI);
+
+	 m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
 
 	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
@@ -1227,9 +1243,9 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == 6000) // irradiation
 	{
-		if (m_irradiation_time_left > 1)
+		if (m_run_countdown > 1)
 		{
-			--m_irradiation_time_left;
+			--m_run_countdown;
 			UpdateData(FALSE);
 		}
 		else
@@ -1281,39 +1297,66 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 
 			CString text;
 			//if (!srq()) // gestione srq 
-			{
+			
 				
 				irradiation_ends_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
 				//  mettere in modalità misura OFF elettrometro monitor (dare il GET per la memorizzazione valore finale)
 				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
 				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
 				
-				text = L"GET";  // 
-				write_GPIB(m_adr_k617_monitor, text);
+				//text = L"GET";  // 
+				//write_GPIB(m_adr_k617_monitor, text);
+				text = L"G1X";
+				write_GPIB(m_adr_k617_monitor, text); // comando di lettura misure senza prefisso
 
-				//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
+				CString rMString, timeStr, temp; 
+
+				read_GPIB(m_adr_k617_monitor, &rMString);
+
 				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
 				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
 				irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
-			}
+				AcquireTmon(1);
+				AcquirePmon(1);
+				AcquireHmon(1);
 
-			text = L"B1G1X";
-			write_GPIB(m_adr_k617_monitor, text); // comando di lettura del buffer + misure senza prefisso
-
-			int status, l;
+				timeStr.Format(L"%.2f", irradiation_ends_now);
+				temp.Format(L"%.1f", (TMbegin + TMend) / 2.0);
+				add_message(L"\nVM2=" + rMString + L" t2=" + timeStr + L" (T="+temp +L" °C,");
+				temp.Format(L"%.1f", (PMbegin + PMend) / 2.0);
+				add_message(L" P=" + temp+L" hPa, ");
+				temp.Format(L"%.1f", (HMbegin + HMend) / 2.0);
+				add_message(L" Hr%=" + temp + L")");
 			
-			//char rm[5000];				 // stringhe per scaricare buffer sia dell'elettrometro (per ora non la uso...)
-			CString rMString;  // per scaricare buffer dell'elettrometro collegato al monitor (M)
+				text = L"C1Z0X";
+				write_GPIB(m_adr_k617_monitor, text); // zero check ON, correct OFF
 
-			read_GPIB(m_adr_k617_monitor, &rMString);
-			MessageBox(L"Buffer =" + rMString);
+				ElaborateMonitorData();
+				temp.Format(L"%.5e", QMON);
+				add_message(L"Qmonitor=" + temp + L" /pC");
+				temp.Format(L"%.5e", IMON);
+				add_message(L"Imonitor=" + temp + L" /pA");
 
-			text = L"B1G1X";
-			write_GPIB(m_adr_k617_monitor, text); // comando di lettura del buffer + misure senza prefisso
-
-	
-			read_GPIB(m_adr_k617_monitor, &rMString);
-			MessageBox(L"Buffer =" + rMString);
+				//m_final_phase_time_left = 180; // da decommentare dopo fase di test
+				m_run_countdown = 10; // solo per test veloci
+				SetTimer(6003, 1000, NULL); 
+		}
+	}
+	else if (nIDEvent == 6003) // TIMER PER la fase finale di 180 sec (post-irradiation o post heating)
+	{
+		if (m_run_countdown > 1) // Countdown showing time left to creation of run 'dump' file, via the instantiation of a run-class object
+		{
+			--m_run_countdown; 
+			UpdateData(FALSE);
+		}
+		else
+		{
+			KillTimer(6003);
+			OnCbnSelchangeComboIrradiationTime(); // shows the duration that the next run will have.
+			run* runObject;
+			runObject = new run(m_directory, m_points_vector_core-1, m_vector_core, 0);
+			runObject->save_to_file();
+			runObject->~run();
 		}
 	}
 
@@ -4581,10 +4624,11 @@ void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, b
 BOOL CminervaRxDlg::K617_configuration(int address)
 {
 	CString text;
-	text = L"C1Z0XF4R3XQ0X";
-	write_GPIB(address, text); // zero check ON, correct OFF, modalità controreazione, buffer ON e range fisso a 20 V
+	text = L"C1Z0XF4R1XQ0X";
+	write_GPIB(address, text); // zero check ON, correct OFF, modalità controreazione, buffer ON e range fisso a 0.2 V (valutare se è il caso di cambiare range o addirittura parametrizzarlo per una scelta a video)
 
-	text = L"M1T3X"; // abilito SRQ per la condizione di overflow e one-shot trigger by GET	
+	//text = L"M1T3X"; // abilito SRQ per la condizione di overflow e one-shot trigger by GET	
+	text = L"M1X"; // abilito SRQ per la condizione di overflow e one-shot trigger by GET	
 	write_GPIB(address, text);
 
 	return 1;
@@ -4722,6 +4766,7 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 			m_thermo_freeze = TRUE; // PID freeze
 			UpdateData(FALSE);
 			m_Combo_Irradiation_Time.EnableWindow(FALSE);
+			m_combo_radiation_quality.EnableWindow(FALSE);
 
 			CString text;
 			text = L"Z1C0X";  // zero correct ON and zero check OFF (electrometer measurement)
@@ -4729,14 +4774,27 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 			
 			//if (!srq()) // gestione srq 
 			{
+				text = L"G1X";
+				write_GPIB(m_adr_k617_monitor, text); // comando di lettura misura singola senza prefisso
+
+				CString rMString, timeStr;
+
 				irradiation_begins_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
-				text = L"GET";  // 
-				write_GPIB(m_adr_k617_monitor, text);
+
+				read_GPIB(m_adr_k617_monitor, &rMString);
+				
+				//text = L"GET";  // 
+				//write_GPIB(m_adr_k617_monitor, text);
 				
 				//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
 				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
 				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
 				irradiation_begins_now = 0.5* (irradiation_begins_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+				timeStr.Format(L"%.2f", irradiation_begins_now);
+				add_message(L"\nVM1 =" + rMString + L" t1=" + timeStr);
+				AcquireTmon(0);
+				AcquirePmon(0);
+				AcquireHmon(0);
 			}
 			
 			
@@ -4772,6 +4830,7 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 		UpdateData(FALSE);
 
 		m_Combo_Irradiation_Time.EnableWindow(TRUE);
+		m_combo_radiation_quality.EnableWindow(TRUE);
 		KillTimer(6000);
 		OnCbnSelchangeComboIrradiationTime();
 
@@ -4783,6 +4842,9 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 		m_ShutterWait = 11;
 		SetTimer(6002, 10, NULL);
 
+		CString text;
+		text = L"C1Z0X";
+		write_GPIB(m_adr_k617_monitor, text); // zero check ON, correct OFF
 	}
 }
 
@@ -4792,7 +4854,7 @@ void CminervaRxDlg::OnCbnSelchangeComboIrradiationTime()
 	// TODO: Add your control notification handler code here
 	CString txt;
 	m_Combo_Irradiation_Time.GetLBText(m_Combo_Irradiation_Time.GetCurSel(), txt);
-	m_irradiation_time_left = (long)wcstod(txt, NULL);
+	m_run_countdown = (long)wcstod(txt, NULL);
 	UpdateData(FALSE);
 }
 
@@ -4863,4 +4925,147 @@ void CminervaRxDlg::OnBnClickedCheckEnableExtendedGPIB()
 	extend_GPIBNetwork();
 	extended_check_instruments();
 	extended_instruments_configuration();
+}
+
+
+void CminervaRxDlg::AcquireTmon(int index)
+{
+	CString TStr;
+	write_GPIB(m_adr_thermo_HP, L"T2X");
+	read_GPIB(m_adr_thermo_HP, &TStr);
+	
+	double T2val = wcstod(TStr, NULL);
+	if (index == 0)
+		TMbegin = T2val;
+	else
+		TMend = T2val;
+}
+
+
+void CminervaRxDlg::AcquirePmon(int index)
+{
+	CString P1CStr;
+	read_GPIB(m_adr_druck, &P1CStr);
+	double P1val = wcstod(P1CStr, NULL);
+	if (index == 0)
+		PMbegin = P1val;
+	else if (index == 1)
+		PMend = P1val;
+}
+
+
+
+
+void CminervaRxDlg::AcquireHmon(int index)
+{
+	CString k199CStr, k199Str2;
+	double k199d;
+
+	CString sec;
+	(double)(clock() / (double)CLOCKS_PER_SEC);
+	sec.Format(L"%.1f", (double)(clock() / (double)CLOCKS_PER_SEC));
+
+	CString sec5;
+	(double)(clock() / (double)CLOCKS_PER_SEC);
+
+	write_GPIB(m_adr_k199, L"F0R0S1P0X");
+	write_GPIB(m_adr_k199, L"O0Q0W0N1X");
+	
+	
+	(double)(clock() / (double)CLOCKS_PER_SEC);
+
+	read_GPIB(m_adr_k199, &k199CStr);
+
+	k199CStr = k199CStr.Right(12);
+	k199d = wcstod(k199CStr, NULL);
+	k199Str2.Format(L"%4.3f", k199d);
+	double Uval = wcstod(k199Str2, NULL);
+
+	if (index == 0)
+	{
+		Uval = Uval * 100;
+		HMbegin = Uval;
+	}
+	else if (index == 1)
+	{
+		Uval = Uval * 100;
+		HMend = Uval;
+	}
+}
+
+
+void CminervaRxDlg::OnCbnSelchangeComboRadiationQuality()
+{
+	// TODO: Add your control notification handler code here
+	int i = m_combo_radiation_quality.GetCurSel();
+	switch (i)
+	{
+	case 0: attenuation_coeff = 0.259; break;
+	case 1: attenuation_coeff = 0.183; break;
+	case 2: attenuation_coeff = 0.162; break;
+	case 3: attenuation_coeff = 0.14; break;
+	}
+}
+
+
+void CminervaRxDlg::ElaborateMonitorData() // handles calculation of QMon, Imon, and their corrections
+{
+	double temp, Ktpm, Katt; // Tutte variabili che potrebbero esser rese globali per poterle riutilizzare
+	CString tempStr;
+	capacitor_value_text.GetWindowTextW(tempStr);
+	capacitor_value_numeric = wcstod(tempStr, NULL);
+	QMON = capacitor_value_numeric*(VMend - VMbegin);
+	IMON = QMON / (irradiation_ends_now - irradiation_begins_now);
+
+	// correzione per ricombinazione ionica:
+	IMON = P_IN + IMON*P_VOL;
+	QMON = IMON*(irradiation_ends_now - irradiation_begins_now);
+
+	// correzione per TP:
+	Ktpm = ((273.15 + ((TMbegin + TMend) / 2.0)) * 1013.25) / (293.15 * ((PMbegin + PMend) / 2.0));
+	IMON = IMON*Ktpm;
+	QMON = QMON*Ktpm;
+
+	// correzione per Hr%:
+	double temp2 = (HMbegin + HMend) / 2.0;
+	if (temp2 <= 10)
+		temp = 0.9993;
+	else if (temp2 > 10 && temp2 <= 15)
+		temp = 0.9993 + (0.9991 - 0.9993) * (temp2 - 10) / 5.0;
+	else if (temp2 > 15 && temp2 <= 20)
+		temp = 0.9991;
+	else if (temp2 > 20 && temp2 <= 25)
+		temp = 0.9991;
+	else if (temp2 > 25 && temp2 <= 30)
+		temp = 0.9991 + (0.9993 - 0.9991) * (temp2 - 25) / 5.0;
+	else if (temp2 > 30 && temp2 <= 35)
+		temp = 0.9993 + (0.9994 - 0.9993) * (temp2 - 30) / 5.0;
+	else if (temp2 > 35 && temp2 <= 40)
+		temp = 0.9994 + (0.9996 - 0.9994) * (temp2 - 35) / 5.0;
+	else if (temp2 > 40 && temp2 <= 45)
+		temp = 0.9996 + (0.9998 - 0.9996) * (temp2 - 40) / 5.0;
+	else if (temp2 > 45 && temp2 <= 50)
+		temp = 0.9998 + (1 - 0.9998) * (temp2 - 45) / 5.0;
+	else if (temp2 > 50 && temp2 <= 55)
+		temp = 1 + (1.0003 - 1) * (temp2 - 50) / 5.0;
+	else if (temp2 > 55 && temp2 <= 60)
+		temp = 1.0003 + (1.0005 - 1.0003) * (temp2 - 55) / 5.0;
+	else if (temp2 > 60 && temp2 <= 65)
+		temp = 1.0005 + (1.0007 - 1.0005) * (temp2 - 60) / 5.0;
+	else if (temp2 > 65 && temp2 <= 70)
+		temp = 1.0007 + (1.0009 - 1.0007) * (temp2 - 65) / 5.0;
+	else if (temp2 > 70)
+		temp = 1;
+	IMON = IMON*temp;
+	QMON = QMON*temp;
+
+	// correzione per Katt:
+	double dm, LattMTP;
+	dm = 39.95; // distanza del monitor dal fuoco
+	LattMTP = (dm / Ktpm) - dm;
+	Katt = exp(attenuation_coeff * 0.0012045 * LattMTP); //densità dell'aria a T=293.15 e P=1013.25 = 0.0012045 g/cm3
+	IMON = IMON*Katt;
+	QMON = QMON*Katt;
+
+
 }

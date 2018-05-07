@@ -39,6 +39,8 @@
 #define DIM_VET_TERMO 1000 // Dimensione vettore dati thermostato
 #define DIM_VET_CORE 4000 // Vector data size. Since TIMER_CORE is set to 500, for the graph to show the entire past one hour you should set this size to at least (3600" / 0.57"), that is 6315 positions.
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
+#define P_IN 1.00088197
+#define P_VOL 9854.7
 
 // CminervaRxDlg dialog
 class CminervaRxDlg : public CDialogEx
@@ -458,7 +460,8 @@ public:
 	CComboBox m_Combo_Irradiation_Time;
 	afx_msg void OnCbnSelchangeComboIrradiationTime();
 	CButton m_button_irradiate;
-	long m_irradiation_time_left;
+	long m_run_countdown;
+	// long m_final_phase_time_left; // countdown for the final elapsed time, after the irradiation or heating phase
 	double irradiation_begins_now;
 	double irradiation_ends_now;
 	int m_ShutterWait;
@@ -470,4 +473,21 @@ public:
 	// // CHECK control to extend the GPIB configuration to include the monitor chamber electrometer etc.
 	CButton m_enable_extended_GPIB_C;
 	afx_msg void OnBnClickedCheckEnableExtendedGPIB();
+	double VMbegin;
+	double VMend;
+	double TMbegin;
+	double TMend;
+	double PMbegin;
+	double PMend;
+	double HMbegin;
+	double HMend;
+	void AcquireTmon(int index);
+	void AcquirePmon(int index);
+	void AcquireHmon(int index);
+	CComboBox m_combo_radiation_quality;
+	afx_msg void OnCbnSelchangeComboRadiationQuality();
+	double attenuation_coeff;
+	void ElaborateMonitorData();
+	double QMON;
+	double IMON;
 };
