@@ -490,4 +490,11 @@ public:
 	void ElaborateMonitorData();
 	double QMON;
 	double IMON;
+	CEdit m_jacket_calibration_seconds_C;
+	CButton m_start_core_injection_C;
+	afx_msg void OnBnClickedChecksynchronize();
+	CButton m_start_jacket_injection_C;
+	CEdit m_jacket_current_calibration_C;
+	afx_msg void OnSelchangeComboCalibrationTime();
+	CStatic m_Countdown_show_phase;
 };
