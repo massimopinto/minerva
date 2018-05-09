@@ -112,7 +112,7 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, m_elements_into_average_thermospeed(0)
 	, m_seconds_continuous_thermostat(0)
 	, m_average_thermospeed(0)
-	, m_CoreHeatingMode(false)
+	, m_CoreHeatingMode(FALSE)
 
 	, m_electrical_calibration_duration_option(0)
 	, capacitor_value_numeric(0)
@@ -250,10 +250,11 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC__GPIB_EXTENSION, m_enable_extended_GPIB_C);
 	DDX_Control(pDX, IDC_COMBO_RADIATION_QUALITY, m_combo_radiation_quality);
 	DDX_Control(pDX, IDC_EDIT26, m_jacket_calibration_seconds_C);
-	DDX_Control(pDX, IDC_BUTTON2, m_start_core_injection_C);
+	DDX_Control(pDX, IDC_BUTTON_Start_Core_Current_Injection, m_start_core_injection_C);
 	DDX_Control(pDX, IDC_BUTTON_start_jacket, m_start_jacket_injection_C);
 	DDX_Control(pDX, IDC_EDIT25, m_jacket_current_calibration_C);
 	DDX_Control(pDX, IDC_STATIC_Countdown_phase, m_Countdown_show_phase);
+	DDX_Control(pDX, IDC_COMBO_RANGE_K617, m_combo_range_k617);
 }
 
 BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
@@ -262,7 +263,7 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_TEST, &CminervaRxDlg::OnBnClickedButtonTest)
 	ON_WM_DESTROY()
-	ON_BN_CLICKED(IDC_BUTTON2, &CminervaRxDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON_Start_Core_Current_Injection, &CminervaRxDlg::OnBnClickedStartCoreInjection)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON_start_jacket, &CminervaRxDlg::OnBnClickedButtonstartjacket)
 	ON_BN_CLICKED(IDC_BUTTON_RUN_CYCLE, &CminervaRxDlg::OnBnClickedButtonRunCycle)
@@ -314,6 +315,7 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_COMBO_RADIATION_QUALITY, &CminervaRxDlg::OnCbnSelchangeComboRadiationQuality)
 	ON_BN_CLICKED(IDC_CHECK_synchronize, &CminervaRxDlg::OnBnClickedChecksynchronize)
 	ON_CBN_SELCHANGE(IDC_COMBO_CALIBRATION_TIME, &CminervaRxDlg::OnSelchangeComboCalibrationTime)
+	ON_CBN_SELCHANGE(IDC_COMBO_RANGE_K617, &CminervaRxDlg::OnCbnSelchangeComboRangeK617)
 END_MESSAGE_MAP()
 
 
@@ -467,6 +469,12 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_Combo_Electrical_Calibration_Time.AddString(L"60 ");
 	 m_Combo_Electrical_Calibration_Time.SetCurSel(0);
 
+	 // Selection of the range on the k617 electrometer connected to the monitor chamber
+	 m_combo_range_k617.AddString(L"0.2");
+	 m_combo_range_k617.AddString(L"2.0");
+	 m_combo_range_k617.AddString(L"20");
+	 m_combo_range_k617.SetCurSel(2);
+
 	 // Radiation Time Combo Box
 	 m_Combo_Irradiation_Time.AddString(L"120");
 	 m_Combo_Irradiation_Time.AddString(L"90 ");
@@ -511,6 +519,11 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 if (m_partial_GPIB_configuration) // GPIB network is limited
 	 {
 		 m_button_irradiate.EnableWindow(FALSE);
+		 m_Combo_Irradiation_Time.EnableWindow(FALSE);
+		 m_combo_radiation_quality.EnableWindow(FALSE);
+		 m_combo_range_k617.EnableWindow(FALSE);
+		 capacitor_number.EnableWindow(FALSE);
+		 capacitor_value_text.EnableWindow(FALSE);
 		 m_enable_extended_GPIB_C.EnableWindow(TRUE);
 	 }
 	 else // GPIB network is extended to the monitor chamber electrometer, thermometer, barometer...
@@ -1195,7 +1208,7 @@ void CminervaRxDlg::K6220_configuration(int address)
 }
 
 
-void CminervaRxDlg::OnBnClickedButton2()
+void CminervaRxDlg::OnBnClickedStartCoreInjection()
 {
 	// Starts injection of current is the heating thermistors of the core
 	// IF this is an electrical calibration, several things must be taken care of:
@@ -1206,6 +1219,7 @@ void CminervaRxDlg::OnBnClickedButton2()
 
 	m_Stop_Core_current_injection_C.EnableWindow(TRUE);
 	m_start_core_injection_C.EnableWindow(FALSE);
+	
 	if (m_secondi_core <= 0 || m_micro_ampere_core <= 0 || m_micro_ampere_core >500 || m_secondi_core>15000)
 	{
 		AfxMessageBox(L"*** ERRORE NEI PARAMETRI IMPOSTATI", MB_OK | MB_ICONSTOP);
@@ -1213,11 +1227,11 @@ void CminervaRxDlg::OnBnClickedButton2()
 	}
 	 
 	m_button_start_cycles_C.EnableWindow(FALSE);
-	 m_flag_core = 1;
-	 k_2400_onoff(0, m_adr_k2400_core);
-	 current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
-	 core_power();
-	 if (m_synchronize) OnBnClickedButtonstartjacket();
+	m_flag_core = 1;
+	k_2400_onoff(0, m_adr_k2400_core);
+	current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
+	core_power();
+	if (m_synchronize) OnBnClickedButtonstartjacket();
 	return;
 }
 
@@ -1260,6 +1274,8 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 		{
 			--m_run_countdown;
 			UpdateData(FALSE);
+			m_Countdown_show_phase.SetWindowTextW(L"Irradiation");
+			m_Countdown_show_phase.ShowWindow(SW_SHOW);
 		}
 		else
 		{
@@ -1277,6 +1293,9 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			OnCbnSelchangeComboIrradiationTime();
 			m_button_irradiate.SetWindowTextW(L"Irradiate");
 			m_Combo_Irradiation_Time.EnableWindow(TRUE);
+			m_combo_radiation_quality.EnableWindow(TRUE);
+			capacitor_number.EnableWindow(TRUE);
+			m_Combo_CoreHeatingMode.EnableWindow(TRUE); // Enable electrical calibration option
 			m_thermo_freeze = FALSE; // PID freeze
 			UpdateData(FALSE);
 		}
@@ -1305,59 +1324,60 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
 
 			CString text;
-			//if (!srq()) // gestione srq 
-			
 				
-				irradiation_ends_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
-				//  mettere in modalità misura OFF elettrometro monitor (dare il GET per la memorizzazione valore finale)
-				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
-				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+			irradiation_ends_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
+			//  mettere in modalità misura OFF elettrometro monitor (dare il GET per la memorizzazione valore finale)
+			//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+			//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
 				
-				//text = L"GET";  // 
-				//write_GPIB(m_adr_k617_monitor, text);
-				text = L"G1X";
-				write_GPIB(m_adr_k617_monitor, text); // comando di lettura misure senza prefisso
+			text = L"G1X";
+			write_GPIB(m_adr_k617_monitor, text); // comando di lettura misure senza prefisso
 
-				CString rMString, timeStr, temp; 
+			CString rMString, timeStr, temp; 
+			read_GPIB(m_adr_k617_monitor, &rMString);
 
-				read_GPIB(m_adr_k617_monitor, &rMString);
-
-				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
-				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
-				irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
-				AcquireTmon(1);
-				AcquirePmon(1);
-				AcquireHmon(1);
-
-				timeStr.Format(L"%.2f", irradiation_ends_now);
-				temp.Format(L"%.1f", (TMbegin + TMend) / 2.0);
-				add_message(L"\nVM2=" + rMString + L" t2=" + timeStr + L" (T="+temp +L" °C,");
-				temp.Format(L"%.1f", (PMbegin + PMend) / 2.0);
-				add_message(L" P=" + temp+L" hPa, ");
-				temp.Format(L"%.1f", (HMbegin + HMend) / 2.0);
-				add_message(L" Hr%=" + temp + L")");
+			//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+			//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+			irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+			irradiation_ends_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
 			
-				text = L"C1Z0X";
-				write_GPIB(m_adr_k617_monitor, text); // zero check ON, correct OFF
+			AcquireTmon(1);
+			AcquirePmon(1);
+			AcquireHmon(1);
 
-				ElaborateMonitorData();
-				temp.Format(L"%.5e", QMON);
-				add_message(L"Qmonitor=" + temp + L" /pC");
-				temp.Format(L"%.5e", IMON);
-				add_message(L"Imonitor=" + temp + L" /pA");
+			timeStr.Format(L"%.3f", irradiation_ends_now);
 
-				//m_final_phase_time_left = 180; // da decommentare dopo fase di test
-				m_run_countdown = 10; // solo per test veloci
-				SetTimer(6003, 1000, NULL); 
+			temp.Format(L"%.1f", (TMbegin + TMend) / 2.0);
+			add_message(L"\nVM2=" + rMString + L", tend=" + timeStr + L" s, T="+temp +L" °C");
+
+			CoreVectorRunEnds.Format(L"%.3f", irradiation_ends_now_core_vector_time);
+			add_message(L"corresponding to a value stored in core vector: " + CoreVectorRunEnds + L" s");
+			temp.Format(L"%.1f", (PMbegin + PMend) / 2.0);
+			add_message(L" P=" + temp+L" hPa");
+			temp.Format(L"%.1f", (HMbegin + HMend) / 2.0);
+			add_message(L" Hr=" + temp + L" %");
+			
+			text = L"C1Z0X";
+			write_GPIB(m_adr_k617_monitor, text); // zero check ON, correct OFF
+
+			ElaborateMonitorData();
+			temp.Format(L"%.5e", QMON);
+			add_message(L"Qmonitor=" + temp + L" /pC");
+			temp.Format(L"%.5e", IMON);
+			add_message(L"Imonitor=" + temp + L" /pA");
+
+			m_run_countdown = POST_RUN_DRIFT_TIME; // Post-run contdown before output to file.
+			SetTimer(6003, 1000, NULL); 
 		}
 	}
-	else if (nIDEvent == 6003) // Timer to handle the final 180 sec after an irradiation (post-irradiation o post heating)
+	else if (nIDEvent == 6003) // Timer to handle the final 180 sec after a heatign run (post-irradiation o post heating)
 	{
 		if (m_run_countdown > 1) // Countdown showing time left to creation of run 'dump' file, via the instantiation of a run-class object
 		{
 			--m_run_countdown; 
 			UpdateData(FALSE);
-			m_Countdown_show_phase.SetWindowTextW(L"Post-Run Period");
+			m_Countdown_show_phase.SetWindowTextW(L"Post-Run Drift");
+			m_Countdown_show_phase.ShowWindow(SW_SHOW);
 		}
 		else
 		{
@@ -1365,11 +1385,15 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			OnCbnSelchangeComboIrradiationTime(); // shows the duration that the next run will have.
 			run* runObject;
-			BOOL filetype;
+			BOOL radiation_calibration = FALSE;
 			if (m_CoreHeatingMode == 1) // You are finishing up an electrical calibration. Not the best control. Find a better **global** one.
-				filetype = TRUE;
-			//else if (); // You were carrying out an irradiation. 
-			runObject = new run(m_directory, m_points_vector_core-1, m_vector_core, filetype);
+				radiation_calibration = TRUE;
+			else if (m_CoreHeatingMode == 0) // You are completing an irradiation. NO. As it stands, this could just be a heating without a calibration.
+				radiation_calibration = FALSE;
+			
+			runObject = new run(m_directory, m_points_vector_core - 1, m_vector_core, radiation_calibration);
+			runObject->t1 = CoreVectorRunStarts;
+			runObject->t2 = CoreVectorRunEnds;
 			runObject->save_to_file();
 			runObject->~run();
 		}
@@ -1392,12 +1416,25 @@ int CminervaRxDlg::core_power()
 		m_joule_core = 0;
 		m_flag_core = 2;
 		old_time = 0;
-		if (m_CoreHeatingMode == 1) create_cycle_file();
-	}
+		if (m_CoreHeatingMode == 1)
+		{
+			create_cycle_file();
+			m_button_irradiate.EnableWindow(FALSE);
+			m_Combo_Irradiation_Time.EnableWindow(FALSE);
+			m_combo_radiation_quality.EnableWindow(FALSE);
+			m_combo_range_k617.EnableWindow(FALSE);
+			capacitor_number.EnableWindow(FALSE);
+			capacitor_value_text.EnableWindow(FALSE);
+			m_thermo_freeze = TRUE;
+			UpdateData(FALSE);
+		}
+			
+	} // portion that is executed regardless of the value of m_flag_core
 		 long cronometer = (clock() - m_timer_core);
 		 double seconds = (double)(cronometer) / 1000.;
 		 text.Format(L"%6.2f", seconds);
 		 m_seconds_core_C.SetWindowTextW(text);
+		 m_Countdown_show_phase.SetWindowTextW(L"Electric Injection");
 		 m_Countdown_show_phase.ShowWindow(SW_SHOW);
 		
 		 volt = k_2400_read_volt(m_adr_k2400_core);
@@ -1416,9 +1453,20 @@ int CminervaRxDlg::core_power()
 		 {
 			 k_2400_onoff(0, m_adr_k2400_core);
 			 KillTimer(1001);
+			 m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			 if (m_CoreHeatingMode == 1) // for electrical calibration, follow the run time with the 6003 timer event handling
 			 {
+				 m_thermo_freeze = FALSE; // disable PID freeze
+				 UpdateData(FALSE);
+
+				 m_run_countdown = POST_RUN_DRIFT_TIME; // Set the countdown at 180 s
 				 SetTimer(6003, 1000, NULL);
+				 m_button_irradiate.EnableWindow(TRUE);
+				 m_Combo_Irradiation_Time.EnableWindow(TRUE);
+				 m_combo_radiation_quality.EnableWindow(TRUE);
+				 m_combo_range_k617.EnableWindow(TRUE);
+				 capacitor_number.EnableWindow(TRUE);
+				 capacitor_value_text.EnableWindow(TRUE);
 			 }
 			 //m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			 m_Stop_Core_current_injection_C.EnableWindow(FALSE);
@@ -1593,7 +1641,7 @@ void CminervaRxDlg::cycle_core_power()
 {
 	if (m_flag_cycle_power_core == 1)
 	{
-		OnBnClickedButton2();
+		OnBnClickedStartCoreInjection();
 		m_done_cycles++;
 		m_aux_text.Format(L"%d", m_done_cycles);
 		m_done_C.SetWindowTextW(m_aux_text);
@@ -2784,7 +2832,7 @@ bool CminervaRxDlg::save_core(double seconds, double resistance, double sigma, d
 		if (m_file_core.m_hFile != CFile::hFileNull)
 	{
 		CString aux;
-		aux.Format(L" %.5f \t%9.9g \t%7.5g \t%9.9g \t%2d \n", seconds, resistance, sigma, trend, m_thermo_freeze);
+		aux.Format(L" %.3f \t%9.9g \t%7.5g \t%9.9g \t%2d \n", seconds, resistance, sigma, trend, m_thermo_freeze);
 		m_file_core.WriteString(aux);
 	}
 
@@ -3025,10 +3073,6 @@ int CminervaRxDlg::jacket_power()
 			m_start_jacket_injection_C.EnableWindow(TRUE);
 			m_Stop_Jacket_current_injection_C.EnableWindow(FALSE);
 		}
-
-
-
-
 	return 0;
 }
 
@@ -4494,7 +4538,7 @@ void CminervaRxDlg::OnCbnSelchangeComboHeatingMode() /* Selects Electrical Calib
 		UpdateData(FALSE);
 		OnBnClickedChecksynchronize();
 	}
-	else if (m_CoreHeatingMode == 1) // Electrical Calibration ON. PID Frozen, calibration run outputed to a file, Timer set for the entire run and for the following 180" to follow the post-run drift. 
+	else if (m_CoreHeatingMode == 1) // Electrical Calibration ON. Calibration run outputed to a file, Timer set for the entire run and for the following 180" to follow the post-run drift. 
 	{
 		m_synchronize = TRUE;
 		UpdateData(FALSE);
@@ -4502,8 +4546,6 @@ void CminervaRxDlg::OnCbnSelchangeComboHeatingMode() /* Selects Electrical Calib
 			
 		// disable unwanted portions of the controls.
 		
-		// m_thermo_freeze = TRUE; NO: this needs to be set only when the actual injection begins, otherwise you lose the control of the PID. These are just settings here.
-		// UpdateData(FALSE);
 		m_Combo_Electrical_Calibration_Time.EnableWindow(TRUE);
 		CString cal_time;
 		int pos_duration = m_Combo_Electrical_Calibration_Time.GetCurSel();
@@ -4665,10 +4707,15 @@ void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, b
 }
 
 
-BOOL CminervaRxDlg::K617_configuration(int address)
+BOOL CminervaRxDlg::K617_configuration(int address, int range) // sets the voltage scale of the electrometer 
 {
 	CString text;
-	text = L"C1Z0XF4R1XQ0X";
+	switch (range)
+	{
+	case 0: text = L"C1Z0XF4R1XQ0X"; break;
+	case 1: text = L"C1Z0XF4R2XQ0X"; break;
+	case 2: text = L"C1Z0XF4R3XQ0X"; break;
+	}
 	write_GPIB(address, text); // zero check ON, correct OFF, modalità controreazione, buffer ON e range fisso a 0.2 V (valutare se è il caso di cambiare range o addirittura parametrizzarlo per una scelta a video)
 
 	//text = L"M1T3X"; // abilito SRQ per la condizione di overflow e one-shot trigger by GET	
@@ -4803,7 +4850,9 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 		
 		if (i == IDYES)
 		{
-
+			m_CoreHeatingMode = 0; // set Calibration mode off and disable Combo Until radiation ends.
+			m_Combo_CoreHeatingMode.SetCurSel(0); 
+			m_Combo_CoreHeatingMode.EnableWindow(FALSE);
 			txt = L"Abort Irradiation";
 			m_button_irradiate.SetWindowTextW(txt);
 
@@ -4811,37 +4860,34 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 			UpdateData(FALSE);
 			m_Combo_Irradiation_Time.EnableWindow(FALSE);
 			m_combo_radiation_quality.EnableWindow(FALSE);
+			capacitor_number.EnableWindow(FALSE);
 
 			CString text;
 			text = L"Z1C0X";  // zero correct ON and zero check OFF (electrometer measurement)
 			write_GPIB(m_adr_k617_monitor, text); 
 			
-			//if (!srq()) // gestione srq 
-			{
-				text = L"G1X";
-				write_GPIB(m_adr_k617_monitor, text); // comando di lettura misura singola senza prefisso
+			text = L"G1X";
+			write_GPIB(m_adr_k617_monitor, text); // comando di lettura misura singola senza prefisso
 
-				CString rMString, timeStr;
+			CString rMString, timeStr;
 
-				irradiation_begins_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
+			irradiation_begins_now = ((double)clock() / (double)CLOCKS_PER_SEC); // Prendere il momento attuale come istante 0- dell'irraggiamento (OK)
 
-				read_GPIB(m_adr_k617_monitor, &rMString);
-				
-				//text = L"GET";  // 
-				//write_GPIB(m_adr_k617_monitor, text);
-				
-				//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
-				//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
-				//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
-				irradiation_begins_now = 0.5* (irradiation_begins_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
-				timeStr.Format(L"%.2f", irradiation_begins_now);
-				add_message(L"\nVM1 =" + rMString + L" t1=" + timeStr);
-				AcquireTmon(0);
-				AcquirePmon(0);
-				AcquireHmon(0);
-			}
+			read_GPIB(m_adr_k617_monitor, &rMString);
+			//  mettere in modalità misura elettrometro monitor (dare il GET per la memorizzazione valore iniziale)
+			//  Prendere il momento attuale come istante 0+ dell'irraggiamento e farne la _media_ con il precedente, sottraendogli poi il t_zero.
+			//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+			irradiation_begins_now = 0.5* (irradiation_begins_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+			irradiation_begins_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
+			timeStr.Format(L"%.2f", irradiation_begins_now);
+			add_message(L"\nVM1 =" + rMString + L", tbegin=" + timeStr + L" s");
 			
-			
+			CoreVectorRunStarts.Format(L"%.3f", irradiation_begins_now_core_vector_time);
+			add_message(L"corresponding to a value stored in core vector: " + CoreVectorRunStarts + L" s");
+			AcquireTmon(0);
+			AcquirePmon(0);
+			AcquireHmon(0);
+
 			float64 value = 4;
 			DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
 			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, 0.0, NULL);
@@ -4865,8 +4911,6 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 	}
 	else // Abort Irradiation Instructions 
 	{
-		
-		
 		txt = L"Irradiate";
 		m_button_irradiate.SetWindowTextW(txt);
 
@@ -4876,6 +4920,7 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 		m_Combo_Irradiation_Time.EnableWindow(TRUE);
 		m_combo_radiation_quality.EnableWindow(TRUE);
 		KillTimer(6000);
+		m_Combo_CoreHeatingMode.EnableWindow(TRUE);
 		OnCbnSelchangeComboIrradiationTime();
 
 		float64 value = 4;
@@ -4895,7 +4940,7 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 
 void CminervaRxDlg::OnCbnSelchangeComboIrradiationTime()
 {
-	// TODO: Add your control notification handler code here
+	// Selection of the Irradiation Time through its Combo Box and update of the radiation time CountDown display.
 	CString txt;
 	m_Combo_Irradiation_Time.GetLBText(m_Combo_Irradiation_Time.GetCurSel(), txt);
 	m_run_countdown = (long)wcstod(txt, NULL);
@@ -4966,6 +5011,11 @@ void CminervaRxDlg::OnBnClickedCheckEnableExtendedGPIB()
 	m_enable_extended_GPIB_C.EnableWindow(FALSE);
 	m_partial_GPIB_configuration = FALSE;
 	m_button_irradiate.EnableWindow(TRUE);
+	m_Combo_Irradiation_Time.EnableWindow(TRUE);
+	m_combo_radiation_quality.EnableWindow(TRUE);
+	m_combo_range_k617.EnableWindow(TRUE);
+	capacitor_number.EnableWindow(TRUE);
+	capacitor_value_text.EnableWindow(TRUE);
 	extend_GPIBNetwork();
 	extended_check_instruments();
 	extended_instruments_configuration();
@@ -5153,5 +5203,22 @@ void CminervaRxDlg::OnSelchangeComboCalibrationTime()
 	m_jacket_calibration_seconds_C.SetWindowTextW(cal_time);
 	// m_jacket_calibration_seconds_C.EnableWindow(FALSE);
 	// UpdateData(TRUE);
+	// UpdateData(FALSE);
+}
+
+
+void CminervaRxDlg::OnCbnSelchangeComboRangeK617()
+{
+	CString txt, range;
+	int i = m_combo_range_k617.GetCurSel();
+	switch (i)
+	{
+	case 0: K617_configuration(m_adr_k617_monitor, 0); break;
+	case 1: K617_configuration(m_adr_k617_monitor, 1); break;
+	case 2: K617_configuration(m_adr_k617_monitor, 2); break;
+	}
+	
+	// m_combo_range_k617.GetLBText(m_combo_range_k617.GetCurSel(), txt);
+	// m_run_countdown = (long)wcstod(txt, NULL);
 	// UpdateData(FALSE);
 }

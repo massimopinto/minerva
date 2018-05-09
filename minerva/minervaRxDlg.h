@@ -39,13 +39,14 @@
 #define DIM_VET_TERMO 1000 // Dimensione vettore dati thermostato
 #define DIM_VET_CORE 4000 // Vector data size. Since TIMER_CORE is set to 500, for the graph to show the entire past one hour you should set this size to at least (3600" / 0.57"), that is 6315 positions.
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
-#define P_IN 1.00088197
+#define P_IN 1.00088197 // Parameters for the calculation of the monitor chambers' kSat (Pin, Pvol)
 #define P_VOL 9854.7
+#define POST_RUN_DRIFT_TIME 180 // 180 seconds to elapse after a single radiation or electrical calibration before another run can be executed
 
 // CminervaRxDlg dialog
 class CminervaRxDlg : public CDialogEx
 {
-	friend bool run::create_electric_run_file();
+	friend bool run::create_run_file();
 // Construction
 public:
 	CminervaRxDlg(CWnd* pParent = NULL);	// standard constructor
@@ -131,7 +132,7 @@ public:
 	CEdit m_joule_core_C;
 	CEdit m_seconds_core_C;
 	CEdit m_volt_core_C;
-	afx_msg void OnBnClickedButton2();
+	afx_msg void OnBnClickedStartCoreInjection();
 	BOOL m_flag_core;
 	BOOL m_flag_jacket;
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
@@ -448,7 +449,7 @@ public:
 	CEdit m_core_set_seconds_C;
 	CButton m_Stop_Core_current_injection_C;
 	CButton m_Stop_Jacket_current_injection_C;
-	BOOL K617_configuration(int address);
+	BOOL K617_configuration(int address, int range = 2);
 	BOOL HP_thermometer_configuration(int address);
 	BOOL K199_configuration(int address);
 	CComboBox capacitor_number;
@@ -461,9 +462,11 @@ public:
 	afx_msg void OnCbnSelchangeComboIrradiationTime();
 	CButton m_button_irradiate;
 	long m_run_countdown;
-	// long m_final_phase_time_left; // countdown for the final elapsed time, after the irradiation or heating phase
-	double irradiation_begins_now;
-	double irradiation_ends_now;
+	
+	double irradiation_begins_now; // when the shutter opnes
+	double irradiation_ends_now; // when the shutter closes
+	double irradiation_begins_now_core_vector_time; // last time value stored in the m_core_vector when the shutter opens (irradiation starts)
+	double irradiation_ends_now_core_vector_time; // last time value stored in the m_core_vector when the shutter closes (irradiation ends)
 	int m_ShutterWait;
 	BOOL m_partial_GPIB_configuration;
 	bool extend_GPIBNetwork();
@@ -481,6 +484,7 @@ public:
 	double PMend;
 	double HMbegin;
 	double HMend;
+	CString CoreVectorRunStarts, CoreVectorRunEnds;
 	void AcquireTmon(int index);
 	void AcquirePmon(int index);
 	void AcquireHmon(int index);
@@ -497,4 +501,6 @@ public:
 	CEdit m_jacket_current_calibration_C;
 	afx_msg void OnSelchangeComboCalibrationTime();
 	CStatic m_Countdown_show_phase;
+	CComboBox m_combo_range_k617;
+	afx_msg void OnCbnSelchangeComboRangeK617();
 };
