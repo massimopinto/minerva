@@ -7,6 +7,7 @@
 #include "ni4882.h"
 #include "afxwin.h"
 #include "afx.h"
+#include <afxdb.h>
 #include "C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\class_linear_regression\regressione.h"
 /* versione che veniva usata fino al 20 Aprile 2017.*/
 //#include "C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\class_grafico_v2\grafico_ver2.h"
@@ -14,6 +15,9 @@
 /*Ricevuta da Stefano L. via email il 6 Aprile 2017. Caricata nel progetto 20/04/2017 sembra non introdurre nuovi errori.*/
 #include "atltime.h"
 #include "run.h"
+#include "dialogrunanalyze.h"
+#include "run_id.h"
+#include "run_measurements.h"
 
 #define BDINDEX               0     // Board Index
 #define PRIMARY_ADDR_OF_DMM   3     // Primary address of device
@@ -21,6 +25,7 @@
 #define TIMEOUT               T3s  // Timeout value = 10 seconds
 #define EOTMODE               1     // Enable the END message
 #define EOSMODE               1     // Disable the EOS mode
+
 
 
 #define TIMER_CORE 500 /* a measurement every 0.5 seconds! 1000 */
@@ -41,7 +46,8 @@
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
 #define P_IN 1.00088197 // Parameters for the calculation of the monitor chambers' kSat (Pin, Pvol)
 #define P_VOL 9854.7
-#define POST_RUN_DRIFT_TIME 180 // 180 seconds to elapse after a single radiation or electrical calibration before another run can be executed
+#define POST_RUN_DRIFT_TIME 10 // !!!TEMP !!!! // bring back to 180 seconds to elapse after a single radiation or electrical calibration before another run can be executed
+#define DIM_VECT_BUFFER (int) ceil((1/0.57)*(RUN_TIME + 2* DRIFT_TIME))  // the dimesion of the buffer vector that will contain 480" of data (0.57" between two consecutive measurements)
 
 // CminervaRxDlg dialog
 class CminervaRxDlg : public CDialogEx
@@ -252,6 +258,7 @@ public:
 	double(*m_vector_thermo)[2];
 	double(*m_vector_core)[2];
 	double(*m_vector_aux)[2];
+	double(*buffer_vect)[2]; // The buffer vector that will hold the part of the stream of core resistance and time data that will be receive from the run-selected file.
 	int m_points_vector_thermo;
 	int m_points_vector_core;
 	int m_points_vector_aux;
@@ -463,10 +470,10 @@ public:
 	CButton m_button_irradiate;
 	long m_run_countdown;
 	
-	double irradiation_begins_now; // when the shutter opnes
-	double irradiation_ends_now; // when the shutter closes
-	double irradiation_begins_now_core_vector_time; // last time value stored in the m_core_vector when the shutter opens (irradiation starts)
-	double irradiation_ends_now_core_vector_time; // last time value stored in the m_core_vector when the shutter closes (irradiation ends)
+	double irradiation_begins_now; // when the shutter opens or when the heating starts
+	double irradiation_ends_now; // when the shutter closes or when the heating stops
+	double irradiation_begins_now_core_vector_time; // last time value stored in the m_core_vector when the shutter opens (irradiation starts) or when injection starts
+	double irradiation_ends_now_core_vector_time; // last time value stored in the m_core_vector when the shutter closes (irradiation ends) or when injection stops
 	int m_ShutterWait;
 	BOOL m_partial_GPIB_configuration;
 	bool extend_GPIBNetwork();
@@ -503,4 +510,13 @@ public:
 	CStatic m_Countdown_show_phase;
 	CComboBox m_combo_range_k617;
 	afx_msg void OnCbnSelchangeComboRangeK617();
+	afx_msg void OnBnClickedButtonAnalyzeRun();
+	
+	// global variable stating the run condition. 0: idle; 1: electric calibration, 2: irradiation
+	int m_run_type;
+
+	CDatabase db;
+	Crun_id* CRecRunId;
+	Crun_measurements* CRecRunMeas;
+	afx_msg void OnBnClickedButtonStopCoreCurrentInjection();
 };

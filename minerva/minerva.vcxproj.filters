@@ -45,6 +45,15 @@
     <ClInclude Include="run.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DialogRunAnalyze.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="run_id.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="run_measurements.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -63,6 +72,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="run.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogRunAnalyze.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="run_id.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="run_measurements.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

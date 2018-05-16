@@ -122,6 +122,7 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, attenuation_coeff(0)
 	, QMON(0)
 	, IMON(0)
+	, m_run_type(0)
 {
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -316,6 +317,8 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_CHECK_synchronize, &CminervaRxDlg::OnBnClickedChecksynchronize)
 	ON_CBN_SELCHANGE(IDC_COMBO_CALIBRATION_TIME, &CminervaRxDlg::OnSelchangeComboCalibrationTime)
 	ON_CBN_SELCHANGE(IDC_COMBO_RANGE_K617, &CminervaRxDlg::OnCbnSelchangeComboRangeK617)
+	ON_BN_CLICKED(IDC_BUTTON_ANALYZE_RUN, &CminervaRxDlg::OnBnClickedButtonAnalyzeRun)
+	ON_BN_CLICKED(IDC_BUTTON_STOP_Core_Current_Injection, &CminervaRxDlg::OnBnClickedButtonStopCoreCurrentInjection)
 END_MESSAGE_MAP()
 
 
@@ -493,6 +496,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 // Countdown and modality
 	 m_run_countdown = 120;
 	 m_Countdown_show_phase.ShowWindow(SW_HIDE); // Will be shown while heating takes place either due to irradiation or electrical heating
+	 m_run_type = 0; // Defaults to 'idle' state which applies to non-calibrating heatings and core drifts
 
 	 m_red_light_thermostat = 0; // no precedence to the thermostat thermistor
 	 m_status_aux = DONE;
@@ -558,6 +562,11 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 DAQmxStartTask(taskHandleCHIUDI);
 
 	 m_seconds_t_zero = ((double)clock() / (double)CLOCKS_PER_SEC);
+	 
+	 // create the recordset:
+	 db.OpenEx(_T("DSN=192.168.120.102;UID=misuraUser; PWD=musy1981; DATABASE=calorimetroRX"), CDatabase::noOdbcDialog);
+	 CRecRunId = new Crun_id(&db);
+	 CRecRunMeas = new Crun_measurements(&db);
 
 	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
@@ -1230,6 +1239,19 @@ void CminervaRxDlg::OnBnClickedStartCoreInjection()
 	m_flag_core = 1;
 	k_2400_onoff(0, m_adr_k2400_core);
 	current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
+	
+	if (m_CoreHeatingMode == 1) // Electrical calibration: connect to Dbase to create Crun_id and Crun_measurements records
+	{
+		m_run_type = 1;
+		CRecRunId->Open();
+		CRecRunId->AddNew();
+		CRecRunId->m_calibration_mode = 1;
+		CString today = (CTime::GetCurrentTime()).Format(L"%Y%m%d");
+		CRecRunId->m_hour = CTime::GetCurrentTime();
+		CRecRunId->m_date = today;
+		CRecRunId->Update();
+		CRecRunId->Requery();
+	}
 	core_power();
 	if (m_synchronize) OnBnClickedButtonstartjacket();
 	return;
@@ -1280,6 +1302,7 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 		else
 		{
 			KillTimer(6000);
+			
 			// Shutter closure operations begin
 			float64 value = 4;
 			DAQmxWriteAnalogScalarF64(taskHandleCHIUDI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
@@ -1310,6 +1333,8 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 
 			float64 value = 0.0;
 			DAQmxWriteAnalogScalarF64(taskHandleAPRI, 0, DAQmx_Val_WaitInfinitely, value, NULL);
+
+			SetTimer(6000, 1000, NULL);
 		}
 	}
 	else if (nIDEvent == 6002) // Timer for handling the closure of the Rx tube Shutter
@@ -1340,6 +1365,7 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			//  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
 			irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
 			irradiation_ends_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
+			VMend = wcstod(rMString, NULL);
 			
 			AcquireTmon(1);
 			AcquirePmon(1);
@@ -1385,17 +1411,42 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			OnCbnSelchangeComboIrradiationTime(); // shows the duration that the next run will have.
 			run* runObject;
-			BOOL radiation_calibration = FALSE;
+			BOOL electrical_calibration = FALSE;
 			if (m_CoreHeatingMode == 1) // You are finishing up an electrical calibration. Not the best control. Find a better **global** one.
-				radiation_calibration = TRUE;
+				electrical_calibration = TRUE;
 			else if (m_CoreHeatingMode == 0) // You are completing an irradiation. NO. As it stands, this could just be a heating without a calibration.
-				radiation_calibration = FALSE;
+				electrical_calibration = FALSE;
+
+			CRecRunId->MoveLast();
+			CRecRunId->Edit();
+			CRecRunId->m_t_core_begin = irradiation_begins_now_core_vector_time;
+			CRecRunId->m_t_core_end = irradiation_ends_now_core_vector_time;
+			if (electrical_calibration)
+			{
+				CRecRunId->m_Injected_energy = m_joule_core;
+				CRecRunId->m_injected_power = m_joule_core / (irradiation_ends_now - irradiation_begins_now);
+			}
+			else
+			{
+				CRecRunId->m_Delta_VMON = VMend - VMbegin;
+				CRecRunId->m_P = 0.5 *(PMbegin + PMend);
+				CRecRunId->m_T = 0.5 *(TMbegin + TMend);
+				CRecRunId->m_H = 0.5 *(HMbegin + HMend);
+			}
+			CRecRunId->Update();
+			CRecRunId->Requery();
+			CRecRunId->MoveLast();
 			
-			runObject = new run(m_directory, m_points_vector_core - 1, m_vector_core, radiation_calibration);
+
+			runObject = new run(m_directory, m_points_vector_core - 1, m_vector_core, electrical_calibration, CRecRunId->m_ID, CRecRunMeas);
 			runObject->t1 = CoreVectorRunStarts;
 			runObject->t2 = CoreVectorRunEnds;
 			runObject->save_to_file();
 			runObject->~run();
+
+			// closing the recordsets related to the ID of the current RUN and associated set of time/resistance measures.
+			if (CRecRunId->IsOpen()) CRecRunId->Close();
+			if (CRecRunMeas->IsOpen()) CRecRunMeas->Close();
 		}
 	}
 
@@ -1418,6 +1469,8 @@ int CminervaRxDlg::core_power()
 		old_time = 0;
 		if (m_CoreHeatingMode == 1)
 		{
+			irradiation_begins_now = ((double)clock() / (double)CLOCKS_PER_SEC) - m_seconds_t_zero;
+			irradiation_begins_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
 			create_cycle_file();
 			m_button_irradiate.EnableWindow(FALSE);
 			m_Combo_Irradiation_Time.EnableWindow(FALSE);
@@ -1456,6 +1509,10 @@ int CminervaRxDlg::core_power()
 			 m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			 if (m_CoreHeatingMode == 1) // for electrical calibration, follow the run time with the 6003 timer event handling
 			 {
+				 //  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
+				 irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+				 irradiation_ends_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
+				 
 				 m_thermo_freeze = FALSE; // disable PID freeze
 				 UpdateData(FALSE);
 
@@ -3084,6 +3141,21 @@ void CminervaRxDlg::OnBnClickedButtonStopCorecalibration()
 	m_start_core_injection_C.EnableWindow(TRUE);
 	m_Stop_Core_current_injection_C.EnableWindow(FALSE);
 	if (m_synchronize) OnBnClickedButtonStopJacketcalibration2();
+	
+	if (!m_CoreHeatingMode) // Destroy the CRun record if this was a calibration. Nothing to be saved as a run record.
+	{
+		if (CRecRunId != NULL)
+		{
+			if (CRecRunId->IsOpen())
+			{
+				CRecRunId->MoveLast();
+				CRecRunId->Delete();
+				CRecRunMeas->MoveLast();
+				CRecRunMeas->Delete();
+				CRecRunId->Close();
+			}
+		}
+	}
 }
 
 
@@ -3973,12 +4045,7 @@ void CminervaRxDlg::OnBnClickedButtonReadThermo()
 	ofn.lpstrFile = p; // Attaches the full path plus the file name, to the CString ThermoSettingsfileName, via the pointer p.
 	ofn.lpstrInitialDir = m_directory; // Starts searching in the Minerva_runs directory 
 
-	//CFileDialog dlgFile(TRUE, NULL, sDummy, OFN_NOCHANGEDIR | OFN_PATHMUSTEXIST, NULL, this);
-	//CFileDialog dlgFile(TRUE, L"*.dat", NULL, OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST, NULL, this);
-
-	// ofn.lpstrTitle = L"Specify Thermostat Settings File";
-	// ofn.lpstrFileTitle = p; // Attaches the filename that the user will select with the CString ThermoSettingsfileName, via the pointer p;
-
+	
 	CString Text;
 
 	if (dlgFile.DoModal() == IDOK) // This launches the actual Open File Dialog 
@@ -3992,11 +4059,7 @@ void CminervaRxDlg::OnBnClickedButtonReadThermo()
 		if (!whatsup)
 		{
 			Text.Format(L" Cannot Read %s, error: %u", ThermoSettingsfileName, fileException.m_cause);
-			//AfxMessageBox(L"Problems with the Thermostat Settings File: Cannot Read %s, error: %u", ThermoSettingsfileName, fileException.m_cause);
-			//AfxMessageBox(L"Problems with the Thermostat Settings File: Cannot Read %s", ThermoSettingsfileName);
 			AfxMessageBox(Text);
-			//Text.Format(L" Opened Thermostat Settings file: %s", ThermoSettingsfileName); // formats to include the ThermoSettingsfileName as a string
-			//AfxMessageBox(Text);
 		}
 		else
 		{ // Extracts all settings from file and updates the control variables. 
@@ -4850,11 +4913,25 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 		
 		if (i == IDYES)
 		{
-			m_CoreHeatingMode = 0; // set Calibration mode off and disable Combo Until radiation ends.
+			CRecRunId->Open();
+			
+			m_run_type = 2; // Irradiation mode. Will commute back to 0 at the end of writing a run to the file.
+			m_CoreHeatingMode = 0; // set Calibration mode off and disable Combo until radiation ends.
 			m_Combo_CoreHeatingMode.SetCurSel(0); 
 			m_Combo_CoreHeatingMode.EnableWindow(FALSE);
 			txt = L"Abort Irradiation";
 			m_button_irradiate.SetWindowTextW(txt);
+
+			CRecRunId->AddNew();
+			CRecRunId->m_calibration_mode = 0;
+			CRecRunId->m_Capacitance = capacitor_value_numeric;
+			m_combo_radiation_quality.GetWindowTextW((CString)CRecRunId->m_RX_Qual);
+			CRecRunId->m_calibration_mode = 0;
+			CString today = (CTime::GetCurrentTime()).Format(L"%Y%m%d");
+			CRecRunId->m_hour = CTime::GetCurrentTime();
+			CRecRunId->m_date = today;
+			CRecRunId->Update();
+			CRecRunId->Requery();
 
 			m_thermo_freeze = TRUE; // PID freeze
 			UpdateData(FALSE);
@@ -4881,7 +4958,7 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 			irradiation_begins_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
 			timeStr.Format(L"%.2f", irradiation_begins_now);
 			add_message(L"\nVM1 =" + rMString + L", tbegin=" + timeStr + L" s");
-			
+			VMbegin = wcstod(rMString, NULL);
 			CoreVectorRunStarts.Format(L"%.3f", irradiation_begins_now_core_vector_time);
 			add_message(L"corresponding to a value stored in core vector: " + CoreVectorRunStarts + L" s");
 			AcquireTmon(0);
@@ -4896,10 +4973,6 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 			m_ShutterWait = 11;
 			SetTimer(6001, 10, NULL);
 
-			
-
-			SetTimer(6000, 1000, NULL);
-
 			/*
 			- aprire lo shutter (il tubo deve già essere stato acceso e scelta la capacità usata per la misura ionometrica col monitor)
 			- partire con un timer di misura da 120 s con passo 120000 ms, allo scadere del quale:
@@ -4911,6 +4984,28 @@ void CminervaRxDlg::OnBnClickedButtonIrradiate()
 	}
 	else // Abort Irradiation Instructions 
 	{
+		// case of abort of irradiation: to delete the partial recordset previously populated
+		if (CRecRunId != NULL)
+		{
+			if (CRecRunId->IsOpen())
+			{	
+				CRecRunId->MoveLast();
+				CString idStr;
+				idStr.Format(L"%d", CRecRunId->m_ID);
+				CRecRunId->Delete();
+				CRecRunId->Close();
+				if (CRecRunMeas->IsOpen()) CRecRunMeas->Close();
+				CRecRunMeas->Open(CRecordset::snapshot, _T("select * from run_measurements where ID_RUN =" + idStr));
+				while (!CRecRunMeas->IsEOF())
+				{
+					CRecRunMeas->Delete();
+					CRecRunMeas->MoveNext();
+				}
+				CRecRunMeas->Close();
+			}	
+		}
+			
+		
 		txt = L"Irradiate";
 		m_button_irradiate.SetWindowTextW(txt);
 
@@ -5221,4 +5316,105 @@ void CminervaRxDlg::OnCbnSelchangeComboRangeK617()
 	// m_combo_range_k617.GetLBText(m_combo_range_k617.GetCurSel(), txt);
 	// m_run_countdown = (long)wcstod(txt, NULL);
 	// UpdateData(FALSE);
+}
+
+
+void CminervaRxDlg::OnBnClickedButtonAnalyzeRun()
+{
+	// TODO: Add your control notification handler code here
+	const int bufferSize = 1024;
+	CString RunfileName = L"DummyRunFile.dat";
+	wchar_t* p = RunfileName.GetBuffer(bufferSize);
+
+	CString sDummy(L"Specify Run File to open...");
+
+	/* Defines the types of files to be displayed in the directory, defaults to ".dat"
+	See https://docs.microsoft.com/en-us/cpp/mfc/reference/cfiledialog-class */
+	TCHAR szFilters[] = _T("radiation runs (*radiation.dat)|*radiation.dat|electric runs (*electric.dat)|*electric.dat|All Files (*.*)|*.*||");
+	CFileDialog dlgFile(TRUE, _T("Runs"), _T("*.dat"),
+		OFN_FILEMUSTEXIST | OFN_HIDEREADONLY, szFilters);
+
+	OPENFILENAME& ofn = dlgFile.GetOFN();
+	ofn.lpstrFile = p; // Attaches the full path plus the file name, to the CString ThermoSettingsfileName, via the pointer p.
+	ofn.lpstrInitialDir = m_directory; // Starts searching in the Minerva_runs directory 
+
+	CString Text;
+
+	if (dlgFile.DoModal() == IDOK) // This launches the actual Open File Dialog 
+	{
+		CStdioFile RunFile;
+		CFileException fileException; // Stores any error messages
+		CString strBuff; // Where the single line file content will be streamed into, once opened; 
+
+		//RunFile.Abort();
+		BOOL whatsup = RunFile.Open(RunfileName, CFile::modeRead, &fileException);
+		if (!whatsup)
+		{
+			Text.Format(L" Cannot Read %s, error: %u", RunfileName, fileException.m_cause);
+			AfxMessageBox(Text);
+		}
+		else
+		{
+			// read the first head line (ID_RUN int, used to select the recordset of measurements data to show)
+			RunFile.ReadString(strBuff);
+			
+			long id = (long) wcstod(strBuff, NULL);
+
+			// scanning the table:
+			/*for (int i = 1; i <= DIM_VECT_BUFFER; i++)
+			{
+				tab = tempStr.Find('\t');
+				timeStr = tempStr.Left(tab);
+				newline = tempStr.Find('\n');
+				resistanceStr = tempStr.Mid(tab,newline-tab);
+				//buffer_vect[i - 1][0] = wcstod(timeStr, NULL);
+				//buffer_vect[i - 1][1] = wcstod(resistanceStr, NULL);
+				if (i == 1)
+				{
+					MessageBox(L"time= " + timeStr + L" resist = " + resistanceStr);
+				}
+
+				tempStr = tempStr.Mid(newline + 1, tempStr.GetLength() - (newline+1));
+			}*/
+			
+			BOOL IRR = FALSE;
+			if (RunfileName.Right(12) != L"electric.dat")
+				IRR = TRUE;
+			CDialogRunAnalyze* dialogRunAnalyze = new CDialogRunAnalyze(this, IRR, id);
+			if (dialogRunAnalyze->Create(IDD_DIALOG_ANALYZE_RUN, this))
+				dialogRunAnalyze->ShowWindow(SW_SHOWNORMAL);
+			else
+				delete dialogRunAnalyze;
+			// dialogRunAnalyze->
+		}
+
+		RunFile.Close();
+	}
+}
+
+
+void CminervaRxDlg::OnBnClickedButtonStopCoreCurrentInjection()
+{
+	// TODO: Add your control notification handler code here
+	// If case of stop the current injection to abort electrical calibration, we must delete the created run_id record and measurements records alredy stored:
+	if (m_CoreHeatingMode == 1) // case of electrical calibration
+	{
+		if (CRecRunId->IsOpen())
+		{
+			CRecRunId->MoveLast();
+			CString idStr;
+			idStr.Format(L"%d", CRecRunId->m_ID);
+			CRecRunId->Delete();
+			CRecRunId->Close();
+			
+			if (CRecRunMeas->IsOpen()) CRecRunMeas->Close();
+			CRecRunMeas->Open(CRecordset::snapshot, _T("select * from run_measurements where ID_RUN =" + idStr));
+			while (!CRecRunMeas->IsEOF())
+			{
+				CRecRunMeas->Delete();
+				CRecRunMeas->MoveNext();
+			}
+			CRecRunMeas->Close();
+		}
+	}
 }

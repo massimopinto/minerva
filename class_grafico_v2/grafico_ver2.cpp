@@ -562,8 +562,7 @@ int grafico_ver2::riempi_tutto(void)
 		 larghezza = puntatoreCDC->GetDeviceCaps(HORZRES);
 		 altezza = puntatoreCDC->GetDeviceCaps(VERTRES);
 	}
-puntatoreCDC->FillSolidRect(origine_x,origine_y,
-		larghezza,altezza,
+	puntatoreCDC->FillSolidRect(origine_x,origine_y,larghezza,altezza,
 		RGB(back_ground_color_out[0],back_ground_color_out[1],back_ground_color_out[2]));
 
 	return 0;

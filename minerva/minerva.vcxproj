@@ -48,7 +48,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\minerva;$(LibraryPath)</LibraryPath>
-    <IncludePath>C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\minerva;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\class_grafico_v2;C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\class_linear_regression;C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\minerva;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -61,7 +61,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\gpib-32.obj;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\gpib-32.obj;odbc32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -91,7 +91,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\gpib-32.obj;C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\NIDAQmx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\gpib-32.obj;C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib32\msvc\NIDAQmx.lib;odbc32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Users\CalRx\Documents\Visual Studio 2013\Projects\minerva\minerva;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
@@ -111,20 +111,26 @@
   <ItemGroup>
     <ClInclude Include="..\class_grafico_v2\grafico_ver2.h" />
     <ClInclude Include="..\class_linear_regression\regressione.h" />
+    <ClInclude Include="DialogRunAnalyze.h" />
     <ClInclude Include="minervaRx.h" />
     <ClInclude Include="minervaRxDlg.h" />
     <ClInclude Include="ni4882.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="run.h" />
+    <ClInclude Include="run_id.h" />
+    <ClInclude Include="run_measurements.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\class_grafico_v2\grafico_ver2.cpp" />
     <ClCompile Include="..\class_linear_regression\regressione.cpp" />
+    <ClCompile Include="DialogRunAnalyze.cpp" />
     <ClCompile Include="minervaRx.cpp" />
     <ClCompile Include="minervaRxDlg.cpp" />
     <ClCompile Include="run.cpp" />
+    <ClCompile Include="run_id.cpp" />
+    <ClCompile Include="run_measurements.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
