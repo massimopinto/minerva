@@ -241,7 +241,7 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO2, m_Combo_CoreHeatingMode);
 	DDX_Control(pDX, IDC_COMBO_CALIBRATION_TIME, m_Combo_Electrical_Calibration_Time);
 	DDX_Control(pDX, IDC_EDIT2, m_core_set_seconds_C);
-	DDX_Control(pDX, IDC_BUTTON_STOP_Core_calibration, m_Stop_Core_current_injection_C);
+	DDX_Control(pDX, IDC_BUTTON_STOP_Core_Current_Injection, m_Stop_Core_current_injection_C);
 	DDX_Control(pDX, IDC_BUTTON_STOP_Jacket_calibration2, m_Stop_Jacket_current_injection_C);
 	DDX_Control(pDX, IDC_COMBO_CAPACITOR, capacitor_number);
 	DDX_Control(pDX, IDC_EDIT33, capacitor_value_text);
@@ -282,8 +282,7 @@ BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_STOP_SHIELD_INJECT, &CminervaRxDlg::OnBnClickedButtonStopShieldInject)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_SPIN2, &CminervaRxDlg::OnDeltaposSpin2)
 	ON_EN_CHANGE(IDC_EDIT1, &CminervaRxDlg::OnEnChangeEdit1)
-	ON_BN_CLICKED(IDC_BUTTON_STOP_Core_calibration, &CminervaRxDlg::OnBnClickedButtonStopCorecalibration)
-//	ON_BN_CLICKED(IDC_BUTTON_STOP_Core_calibration2, &CminervaRxDlg::OnBnClickedButtonStopCorecalibration2)
+	//ON_BN_CLICKED(IDC_BUTTON_STOP_Core_calibration, &CminervaRxDlg::OnBnClickedButtonStopCorecalibration)
 	ON_BN_CLICKED(IDC_BUTTON_STOP_Jacket_calibration2, &CminervaRxDlg::OnBnClickedButtonStopJacketcalibration2)
 	ON_BN_CLICKED(IDC_CHECK2, &CminervaRxDlg::OnBnClickedCheck2)
 	ON_BN_CLICKED(IDC_CHECK3, &CminervaRxDlg::OnBnClickedCheck3)
@@ -1225,17 +1224,18 @@ void CminervaRxDlg::OnBnClickedStartCoreInjection()
 	// 2) the beginning of the heating time is stored (seconds)
 	// 3) At the end of the prescribed calibration time (defaults to 120") data output is handled via  
 	UpdateData(TRUE);
-
-	m_Stop_Core_current_injection_C.EnableWindow(TRUE);
-	m_start_core_injection_C.EnableWindow(FALSE);
 	
 	if (m_secondi_core <= 0 || m_micro_ampere_core <= 0 || m_micro_ampere_core >500 || m_secondi_core>15000)
 	{
 		AfxMessageBox(L"*** ERRORE NEI PARAMETRI IMPOSTATI", MB_OK | MB_ICONSTOP);
 		return;
 	}
-	 
+	
+	// Enabling and disbaling buttons linked to injection of current in the core
+	m_Stop_Core_current_injection_C.EnableWindow(TRUE);
+	m_start_core_injection_C.EnableWindow(FALSE);
 	m_button_start_cycles_C.EnableWindow(FALSE);
+	
 	m_flag_core = 1;
 	k_2400_onoff(0, m_adr_k2400_core);
 	current_inject_k2400(m_micro_ampere_core, m_adr_k2400_core);
@@ -1243,6 +1243,8 @@ void CminervaRxDlg::OnBnClickedStartCoreInjection()
 	if (m_CoreHeatingMode == 1) // Electrical calibration: connect to Dbase to create Crun_id and Crun_measurements records
 	{
 		m_run_type = 1;
+		m_Combo_CoreHeatingMode.EnableWindow(FALSE);
+		m_Combo_Electrical_Calibration_Time.EnableWindow(FALSE);
 		CRecRunId->Open();
 		CRecRunId->AddNew();
 		CRecRunId->m_calibration_mode = 1;
@@ -1396,7 +1398,7 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			SetTimer(6003, 1000, NULL); 
 		}
 	}
-	else if (nIDEvent == 6003) // Timer to handle the final 180 sec after a heatign run (post-irradiation o post heating)
+	else if (nIDEvent == 6003) // Timer to handle the final 180 sec after a heating run (post-irradiation o post heating)
 	{
 		if (m_run_countdown > 1) // Countdown showing time left to creation of run 'dump' file, via the instantiation of a run-class object
 		{
@@ -1404,6 +1406,22 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			UpdateData(FALSE);
 			m_Countdown_show_phase.SetWindowTextW(L"Post-Run Drift");
 			m_Countdown_show_phase.ShowWindow(SW_SHOW);
+			if (m_run_countdown == 60) // Two minutes (180" - 120") after heating bring back a series of controls so that you can repeat a run
+			{
+				// re-enabling all buttons linked to irradiations
+				m_button_irradiate.EnableWindow(TRUE);
+				m_Combo_Irradiation_Time.EnableWindow(TRUE);
+				m_combo_radiation_quality.EnableWindow(TRUE);
+				m_combo_range_k617.EnableWindow(TRUE);
+				capacitor_number.EnableWindow(TRUE);
+				capacitor_value_text.EnableWindow(TRUE);
+
+				// re-enabling all controls for Calibrations (Mode and Time Combos, Start and Stop buttons )
+				m_Combo_CoreHeatingMode.EnableWindow(TRUE);
+				m_Combo_Electrical_Calibration_Time.EnableWindow(TRUE);
+				m_Stop_Core_current_injection_C.EnableWindow(FALSE); 
+				m_start_core_injection_C.EnableWindow(TRUE);
+			}
 		}
 		else
 		{
@@ -1437,8 +1455,13 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			CRecRunId->Requery();
 			CRecRunId->MoveLast();
 			
+			int run_time = 0;
+			if (electrical_calibration)
+				run_time = m_secondi_core;
+			else
+				run_time = m_run_countdown;
 
-			runObject = new run(m_directory, m_points_vector_core - 1, m_vector_core, electrical_calibration, CRecRunId->m_ID, CRecRunMeas);
+			runObject = new run(m_directory, m_points_vector_core - 1, m_vector_core, electrical_calibration, run_time, CRecRunId->m_ID, CRecRunMeas);
 			runObject->t1 = CoreVectorRunStarts;
 			runObject->t2 = CoreVectorRunEnds;
 			runObject->save_to_file();
@@ -1513,23 +1536,38 @@ int CminervaRxDlg::core_power()
 				 irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
 				 irradiation_ends_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
 				 
+				 m_file_cycle.Close();
+
 				 m_thermo_freeze = FALSE; // disable PID freeze
 				 UpdateData(FALSE);
 
 				 m_run_countdown = POST_RUN_DRIFT_TIME; // Set the countdown at 180 s
 				 SetTimer(6003, 1000, NULL);
+				 
+				 /*
+				 // re-enabling all buttons linked to irradiations
+				 // To do: begins here -> 2018 05 18: Move all these re-habilitations to the 6003 timer and enable them after 120" (not 180").
 				 m_button_irradiate.EnableWindow(TRUE);
 				 m_Combo_Irradiation_Time.EnableWindow(TRUE);
 				 m_combo_radiation_quality.EnableWindow(TRUE);
 				 m_combo_range_k617.EnableWindow(TRUE);
 				 capacitor_number.EnableWindow(TRUE);
 				 capacitor_value_text.EnableWindow(TRUE);
+
+				 // re-enabling all controls for Calibrations (Mode and Time)
+				 m_Combo_CoreHeatingMode.EnableWindow(FALSE);
+				 m_Combo_Electrical_Calibration_Time.EnableWindow(FALSE);
+				 // To do: ends here -> 2018 05 18
+				 */
+			 }
+			 else if (m_CoreHeatingMode == 0) // Heating without a calibration
+			 {
+				 m_Stop_Core_current_injection_C.EnableWindow(FALSE);
+				 m_start_core_injection_C.EnableWindow(TRUE);
 			 }
 			 //m_Countdown_show_phase.ShowWindow(SW_HIDE);
-			 m_Stop_Core_current_injection_C.EnableWindow(FALSE);
-			 m_start_core_injection_C.EnableWindow(TRUE);
+			 
 			 m_flag_core = 3;
-			 if (m_CoreHeatingMode == 1) m_file_cycle.Close();
 			 m_button_start_cycles_C.EnableWindow(TRUE);
 		 }
 	return 0;
@@ -3134,31 +3172,6 @@ int CminervaRxDlg::jacket_power()
 }
 
 
-void CminervaRxDlg::OnBnClickedButtonStopCorecalibration()
-{
-	k_2400_onoff(0, m_adr_k2400_core);
-	KillTimer(1001);
-	m_start_core_injection_C.EnableWindow(TRUE);
-	m_Stop_Core_current_injection_C.EnableWindow(FALSE);
-	if (m_synchronize) OnBnClickedButtonStopJacketcalibration2();
-	
-	if (!m_CoreHeatingMode) // Destroy the CRun record if this was a calibration. Nothing to be saved as a run record.
-	{
-		if (CRecRunId != NULL)
-		{
-			if (CRecRunId->IsOpen())
-			{
-				CRecRunId->MoveLast();
-				CRecRunId->Delete();
-				CRecRunMeas->MoveLast();
-				CRecRunMeas->Delete();
-				CRecRunId->Close();
-			}
-		}
-	}
-}
-
-
 void CminervaRxDlg::OnBnClickedButtonStopJacketcalibration2()
 {
 	k_2400_onoff(0, m_adr_k2400_jacket);
@@ -4625,8 +4638,6 @@ void CminervaRxDlg::OnCbnSelchangeComboHeatingMode() /* Selects Electrical Calib
 		m_core_set_seconds_C.EnableWindow(FALSE);
 		m_jacket_calibration_seconds_C.SetWindowTextW(cal_time);
 		m_jacket_calibration_seconds_C.EnableWindow(FALSE);
-		// UpdateData(TRUE);
-			
 	}
 	// UpdateData(FALSE);
 }
@@ -5397,8 +5408,16 @@ void CminervaRxDlg::OnBnClickedButtonStopCoreCurrentInjection()
 {
 	// TODO: Add your control notification handler code here
 	// If case of stop the current injection to abort electrical calibration, we must delete the created run_id record and measurements records alredy stored:
+	k_2400_onoff(0, m_adr_k2400_core);
+	KillTimer(1001);
+	m_start_core_injection_C.EnableWindow(TRUE);
+	m_Stop_Core_current_injection_C.EnableWindow(FALSE);
+	if (m_synchronize) OnBnClickedButtonStopJacketcalibration2();
+	
+	
 	if (m_CoreHeatingMode == 1) // case of electrical calibration
 	{
+		MessageBox(L"stop");
 		if (CRecRunId->IsOpen())
 		{
 			CRecRunId->MoveLast();

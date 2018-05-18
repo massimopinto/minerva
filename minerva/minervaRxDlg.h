@@ -46,8 +46,8 @@
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
 #define P_IN 1.00088197 // Parameters for the calculation of the monitor chambers' kSat (Pin, Pvol)
 #define P_VOL 9854.7
-#define POST_RUN_DRIFT_TIME 10 // !!!TEMP !!!! // bring back to 180 seconds to elapse after a single radiation or electrical calibration before another run can be executed
-#define DIM_VECT_BUFFER (int) ceil((1/0.57)*(RUN_TIME + 2* DRIFT_TIME))  // the dimesion of the buffer vector that will contain 480" of data (0.57" between two consecutive measurements)
+#define POST_RUN_DRIFT_TIME 180 // 180 seconds to elapse after a single radiation or electrical calibration before another run can be executed
+//#define DIM_VECT_BUFFER (int) ceil((1/0.57)*(RUN_TIME + 2* DRIFT_TIME))  // the dimesion of the buffer vector that will contain 480" of data (0.57" between two consecutive measurements)
 
 // CminervaRxDlg dialog
 class CminervaRxDlg : public CDialogEx
@@ -291,8 +291,6 @@ public:
 	int jacket_power();
 	long m_timer_jacket;
 	double m_joule_jacket;
-	afx_msg void OnBnClickedButtonStopCorecalibration();
-	afx_msg void OnBnClickedButtonStopCorecalibration2();
 	afx_msg void OnBnClickedButtonStopJacketcalibration2();
 	BOOL m_synchronize;
 	int m_thermostat_reading_interval;

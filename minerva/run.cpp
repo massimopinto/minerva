@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "run.h"
 
-run::run(CString directory, int last_index, double(*vector)[2], BOOL electric, long RunID, Crun_measurements* recMeas) // The constructor will be invoked with the name of the directory where output shall be written to.
+run::run(CString directory, int last_index, double(*vector)[2], BOOL electric, int run_duration, long RunID, Crun_measurements* recMeas) // The constructor will be invoked with the name of the directory where output shall be written to.
 {
 	path = directory;
 	
@@ -11,6 +11,12 @@ run::run(CString directory, int last_index, double(*vector)[2], BOOL electric, l
 
 	RUNID = RunID;
 	CRecRunMeas = recMeas;
+	
+	int vector_time_span = run_duration + 2 * DRIFT_TIME;
+	/* TO DO 18/05/2018 Search for the vector's index corresponding to vector_time_span behind the last point (example: 180+180+120 = 480 seconds earlier)*/
+	
+	// Make this obsolete when the above is fixed.
+	DIM_VECT_BUFFER = (int)ceil((1 / 0.57)*(run_duration + 2 * DRIFT_TIME));
 
 	buffer_vect = new (double[DIM_VECT_BUFFER][2]); 
 	for (int ctr = 0; ctr < DIM_VECT_BUFFER; ctr++) // Copies the last DIM_VECT_BUFFER values of vector in the protected buffer_vect
