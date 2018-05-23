@@ -220,9 +220,6 @@ VOID grafico_ver2::plot_single_point(double x, double y, BOOL primo_punto)
 	puntatoreCDC->LineTo(m_last_point);
 	}
 		m_last_point =   punto;
-	 
-
-
 		
 }
 
@@ -262,7 +259,7 @@ VOID grafico_ver2::riempi_sfondo()
 
 VOID grafico_ver2::plotta_frame()
 {
- riempi_sfondo();
+	 riempi_sfondo();
  	 puntatoreCDC->SelectObject(&penna_frame);
 	 puntatoreCDC->SelectObject(&carattere);
 	 puntatoreCDC->SetBkMode(TRANSPARENT);

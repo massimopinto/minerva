@@ -4,7 +4,7 @@
 
 // Crun_id implementation
 
-// code generated on venerdì 11 maggio 2018, 11:15
+// code generated on mercoledì 23 maggio 2018, 14:21
 
 #include "stdafx.h"
 #include "run_id.h"
@@ -29,7 +29,12 @@ Crun_id::Crun_id(CDatabase* pdb)
 	m_injected_power = 0.0;
 	m_Injected_energy = 0.0;
 	m_Capacitance = 0.0;
-	m_nFields = 16;
+	m_delta_R = 0.0;
+	m_mid_R = 0.0;
+	m_deltaR_over_R = 0.0;
+	m_preDrift_slope = 0.0;
+	m_postDrift_slope = 0.0;
+	m_nFields = 21;
 	m_nDefaultType = snapshot;
 }
 //#error Security Issue: The connection string may contain a password
@@ -69,6 +74,12 @@ void Crun_id::DoFieldExchange(CFieldExchange* pFX)
 	RFX_Double(pFX, _T("[injected_power]"), m_injected_power);
 	RFX_Double(pFX, _T("[Injected_energy]"), m_Injected_energy);
 	RFX_Double(pFX, _T("[Capacitance]"), m_Capacitance);
+	RFX_Double(pFX, _T("[delta_R]"), m_delta_R);
+	RFX_Double(pFX, _T("[mid_R]"), m_mid_R);
+	RFX_Double(pFX, _T("[deltaR_over_R]"), m_deltaR_over_R);
+	RFX_Double(pFX, _T("[preDrift_slope]"), m_preDrift_slope);
+	RFX_Double(pFX, _T("[postDrift_slope]"), m_postDrift_slope);
+
 }
 /////////////////////////////////////////////////////////////////////////////
 // Crun_id diagnostics

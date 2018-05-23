@@ -48,10 +48,10 @@
     <ClInclude Include="DialogRunAnalyze.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="run_id.h">
+    <ClInclude Include="run_measurements.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="run_measurements.h">
+    <ClInclude Include="run_id.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -77,10 +77,10 @@
     <ClCompile Include="DialogRunAnalyze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="run_id.cpp">
+    <ClCompile Include="run_measurements.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="run_measurements.cpp">
+    <ClCompile Include="run_id.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -95,6 +95,7 @@
     </None>
     <None Include="ClassDiagram.cd" />
     <None Include="ClassDiagram1.cd" />
+    <None Include="ClassDiagram2.cd" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\minerva.ico">

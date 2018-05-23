@@ -2,7 +2,7 @@
 
 #pragma once
 
-// code generated on venerdì 11 maggio 2018, 11:15
+// code generated on mercoledì 23 maggio 2018, 14:21
 
 class Crun_id : public CRecordset
 {
@@ -33,9 +33,14 @@ public:
 	double	m_H;
 	CStringA	m_RX_Qual;
 	double	m_Delta_VMON;
-	double m_injected_power;
+	double	m_injected_power;
 	double	m_Injected_energy;
 	double	m_Capacitance;
+	double	m_delta_R;
+	double	m_mid_R;
+	double	m_deltaR_over_R;
+	double	m_preDrift_slope;
+	double	m_postDrift_slope;
 
 // Overrides
 	// Wizard generated virtual function overrides
@@ -51,7 +56,6 @@ public:
 	virtual void Dump(CDumpContext& dc) const;
 #endif
 
-	
 };
 
 

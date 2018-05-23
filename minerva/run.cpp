@@ -16,8 +16,21 @@ run::run(CString directory, int last_index, double(*vector)[2], BOOL electric, i
 	/* TO DO 18/05/2018 Search for the vector's index corresponding to vector_time_span behind the last point (example: 180+180+120 = 480 seconds earlier)*/
 	
 	// Make this obsolete when the above is fixed.
-	DIM_VECT_BUFFER = (int)ceil((1 / 0.57)*(run_duration + 2 * DRIFT_TIME));
+	//DIM_VECT_BUFFER = (int)ceil((1 / 0.57)*(run_duration + 2 * DRIFT_TIME));
+	double last_time = vector[last_index][0];
+	double first_time = last_time - vector_time_span;
+	if (first_time < 0) first_time = 0;
+	int first_index = 0;
+	int i = last_index;
+	while (vector[i][0] > first_time)
+	{
+		i--;
 
+	}
+	first_index = i;
+
+	DIM_VECT_BUFFER = last_index - first_index;
+	
 	buffer_vect = new (double[DIM_VECT_BUFFER][2]); 
 	for (int ctr = 0; ctr < DIM_VECT_BUFFER; ctr++) // Copies the last DIM_VECT_BUFFER values of vector in the protected buffer_vect
 	{
@@ -27,13 +40,8 @@ run::run(CString directory, int last_index, double(*vector)[2], BOOL electric, i
 	
 	for (int ctr = 0; ctr < DIM_VECT_BUFFER; ctr++) // Copies the last DIM_VECT_BUFFER values of vector in the protected buffer_vect
 	{
-		if (last_index - ctr >= 0)
-		{
-			buffer_vect[DIM_VECT_BUFFER - 1 - ctr][0] = vector[last_index - ctr][0]; // with m_core_vector in mind, this was created with size 'DIM_VET_CORE + 2'
-			buffer_vect[DIM_VECT_BUFFER - 1 - ctr][1] = vector[last_index - ctr][1];
-		}
-		else
-			break;
+		buffer_vect[DIM_VECT_BUFFER - 1 - ctr][0] = vector[last_index - ctr][0]; // with m_core_vector in mind, this was created with size 'DIM_VET_CORE + 2'
+		buffer_vect[DIM_VECT_BUFFER - 1 - ctr][1] = vector[last_index - ctr][1];
 	}	
 }
 
