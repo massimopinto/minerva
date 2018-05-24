@@ -1408,14 +1408,17 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			m_Countdown_show_phase.ShowWindow(SW_SHOW);
 			if (m_run_countdown == 60) // Two minutes (180" - 120") after heating bring back a series of controls so that you can repeat a run
 			{
-				// re-enabling all buttons linked to irradiations
-				m_button_irradiate.EnableWindow(TRUE);
-				m_Combo_Irradiation_Time.EnableWindow(TRUE);
-				m_combo_radiation_quality.EnableWindow(TRUE);
-				m_combo_range_k617.EnableWindow(TRUE);
-				capacitor_number.EnableWindow(TRUE);
-				capacitor_value_text.EnableWindow(TRUE);
-
+				// re-enabling all buttons linked to irradiations, if the GPIB is extended
+				if (!m_partial_GPIB_configuration)
+				{
+					m_button_irradiate.EnableWindow(TRUE);
+					m_Combo_Irradiation_Time.EnableWindow(TRUE);
+					m_combo_radiation_quality.EnableWindow(TRUE);
+					m_combo_range_k617.EnableWindow(TRUE);
+					capacitor_number.EnableWindow(TRUE);
+					capacitor_value_text.EnableWindow(TRUE);
+				}
+				
 				// re-enabling all controls for Calibrations (Mode and Time Combos, Start and Stop buttons )
 				m_Combo_CoreHeatingMode.EnableWindow(TRUE);
 				m_Combo_Electrical_Calibration_Time.EnableWindow(TRUE);
@@ -1439,14 +1442,18 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			CRecRunId->Edit();
 			CRecRunId->m_t_core_begin = irradiation_begins_now_core_vector_time;
 			CRecRunId->m_t_core_end = irradiation_ends_now_core_vector_time;
+
 			if (electrical_calibration)
 			{
 				CRecRunId->m_Injected_energy = m_joule_core;
 				CRecRunId->m_injected_power = m_joule_core / (irradiation_ends_now - irradiation_begins_now);
+				CRecRunId->m_t_mon_begin = irradiation_begins_now;
+				CRecRunId->m_t_mon_end = irradiation_ends_now;
 			}
-			else
+			else if (!electrical_calibration)
 			{
 				CRecRunId->m_Delta_VMON = VMend - VMbegin;
+				// CRecRunId->m_QMON = QMON;
 				CRecRunId->m_P = 0.5 *(PMbegin + PMend);
 				CRecRunId->m_T = 0.5 *(TMbegin + TMend);
 				CRecRunId->m_H = 0.5 *(HMbegin + HMend);
@@ -1532,8 +1539,8 @@ int CminervaRxDlg::core_power()
 			 m_Countdown_show_phase.ShowWindow(SW_HIDE);
 			 if (m_CoreHeatingMode == 1) // for electrical calibration, follow the run time with the 6003 timer event handling
 			 {
-				 //  Note: this is a strategy to estimate the moment in which the voltage measurement on the electrometer was actually made and stored. 
-				 irradiation_ends_now = 0.5* (irradiation_ends_now + ((double)clock() / (double)CLOCKS_PER_SEC)) - m_seconds_t_zero;
+				 
+				 irradiation_ends_now = ((double)clock() / (double)CLOCKS_PER_SEC) - m_seconds_t_zero;
 				 irradiation_ends_now_core_vector_time = m_vector_core[m_points_vector_core - 1][0];
 				 
 				 m_file_cycle.Close();

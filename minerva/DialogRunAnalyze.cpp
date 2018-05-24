@@ -18,6 +18,7 @@ CDialogRunAnalyze::CDialogRunAnalyze(CWnd* pParent /*=NULL*/, BOOL irradiation, 
 	CRecRunId = new Crun_id();
 	m_grafico_run = new grafico_ver2;
 	
+	IDrun = id_run;
 	CString idStr;
 	idStr.Format(L"%d", id_run);
 	CRecRunId->Open(CRecordset::snapshot, _T("select * from run_id where ID =" + idStr));
@@ -31,9 +32,15 @@ CDialogRunAnalyze::CDialogRunAnalyze(CWnd* pParent /*=NULL*/, BOOL irradiation, 
 	}
 	CRecRunMeas->MoveFirst();
 
+	date = CRecRunId->m_date;
+	hour = CRecRunId->m_hour;
+	is_calibration = CRecRunId->m_calibration_mode;
+	power = CRecRunId->m_injected_power;
+	energy = CRecRunId->m_Injected_energy;
+
 	m_vector_run = new (double[vector_size][2]);
 	
-	for (int i = 0; i < vector_size; i++) // popolo il vettore da graficare
+	for (int i = 0; i < vector_size; i++) // Construct the vector to be plotted
 	{
 		m_vector_run[i][0] = CRecRunMeas->m_time;
 		m_vector_run[i][1] = CRecRunMeas->m_resistance;
@@ -118,14 +125,15 @@ CDialogRunAnalyze::CDialogRunAnalyze(CWnd* pParent /*=NULL*/, BOOL irradiation, 
 	R2 = mid_T *slope_postDrift + intercept_postDrift;
 	delta_R = R1-R2;
 	mid_R = 0.5*(R1 + R2);
+	calibration_coefficient = energy / (1000* delta_R / mid_R); 
 
+	CRecRunId->Edit();
 	CRecRunId->m_delta_R = delta_R;
 	CRecRunId->m_mid_R = mid_R;
 	CRecRunId->m_deltaR_over_R = (delta_R / mid_R);
 	CRecRunId->m_preDrift_slope = slope_preDrift;
 	CRecRunId->m_postDrift_slope = slope_postDrift;
-	
-	// CRecRunId->Update();
+	CRecRunId->Update();
 	CRecRunId->Requery();
 }
 
@@ -138,6 +146,7 @@ void CDialogRunAnalyze::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_STATIC_RUN_GRAPH, m_graph_run_C);
 	DDX_Control(pDX, IDC_STATIC_run_duration, m_run_duration);
+	DDX_Control(pDX, IDC_STATIC_run_duration2, m_run_info);
 }
 
 
@@ -166,17 +175,37 @@ BOOL CDialogRunAnalyze::OnInitDialog()
 	
 	// Prepare text to be displayed below the plot, summaring run information and results
 	
-	CString tmp, tmp1, tmp2, tmp3, tmp4, tmp5;
+	CString tmp, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6;
 	tmp.Format(L"%.1f", delta_T);
 	tmp1.Format(L"%.3f", 1000*delta_R);
 	tmp2.Format(L"%.3f", mid_R);
 	tmp3.Format(L"%.3f", (1000*delta_R) / mid_R);
 	tmp4.Format(L"%.3f", 1000*slope_preDrift);
 	tmp5.Format(L"%.3f", 1000*slope_postDrift);
-	m_run_duration.SetWindowTextW(L"run duration:" +tmp+ L" /s\ndelta_R: " +tmp1+ L" mOhm\nmid_R: " +tmp2+ L" Ohm\ndelta_R/R: " +tmp3+ L" mOhm/Ohm\n\nslope_pre: " +tmp4+ L" mOhm/s\nslope_post: " +tmp5+ L" mOhm/s");
+	m_run_duration.SetWindowTextW(L"run duration:" +tmp+ L" /s\ndelta_R: " +tmp1+ L" mOhm\nmid_R: " +tmp2+ L" Ohm\ndelta_R/R: " 
+		+tmp3+ L" mOhm/Ohm\n\nslope_pre: " +tmp4+ L" mOhm/s\nslope_post: " +tmp5+ L" mOhm/s");
 	m_run_duration.ShowWindow(SW_SHOW);
 	
+	tmp.Format(L"%d", IDrun);
+	tmp2 = hour.Format(L"%H:%M:%S"); // rivedi questa formattazione perché nin funzia
+	
+	if (is_calibration) 
+	{
+		tmp3 = "calibration";
+		tmp4.Format(L"%.2f", power);
+		tmp5.Format(L"%.2f", energy);
+		tmp6.Format(L"%.2f", calibration_coefficient);
+		m_run_info.SetWindowTextW(L"Run ID: " + tmp + L"\nDate: " + (CString)date + L"\nHour: " + tmp2 + L"\n\nHeating mode: " + tmp3 +
+			L"\ninjected power: " + tmp4 + L" uW\nInjected energy:" + tmp5 + L" uJ\n\ncalibration coefficient: " + tmp6 + L" uJ / (mOhm/Ohm)");
+	}
+	else if (!is_calibration)
+	{
+		tmp3 = "irradiation";
 
+	}
+		
+
+	
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	
 	return TRUE;  // return TRUE unless you set the focus to a control

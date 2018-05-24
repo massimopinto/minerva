@@ -45,6 +45,11 @@ protected:
 	double intercept_preDrift;
 	double slope_postDrift;
 	double intercept_postDrift;
+	long IDrun;
+	CStringA date;
+	CTime hour;
+	bool is_calibration;
+	double power, energy, calibration_coefficient;
 
 	DECLARE_MESSAGE_MAP()
 public:
@@ -62,4 +67,6 @@ public:
 	void MergeSort(double*vector, int left, int right);
 	void Merge(double*vector, int left, int center, int right);
 	CStatic m_run_duration;
+	// assists in displaying general information on the run being visualized
+	CStatic m_run_info;
 };
