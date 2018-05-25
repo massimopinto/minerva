@@ -50,6 +50,7 @@ protected:
 	CTime hour;
 	bool is_calibration;
 	double power, energy, calibration_coefficient;
+	double QMON, kAtt, kTP;
 
 	DECLARE_MESSAGE_MAP()
 public:

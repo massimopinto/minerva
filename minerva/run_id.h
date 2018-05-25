@@ -2,7 +2,7 @@
 
 #pragma once
 
-// code generated on mercoledì 23 maggio 2018, 14:21
+// code generated on giovedì 24 maggio 2018, 14:33
 
 class Crun_id : public CRecordset
 {
@@ -33,13 +33,18 @@ public:
 	double	m_H;
 	CStringA	m_RX_Qual;
 	double	m_Delta_VMON;
+	double	m_katt;
+	double	m_ktp;
+	double	m_QMON;
 	double	m_injected_power;
 	double	m_Injected_energy;
 	double	m_Capacitance;
 	double	m_delta_R;
 	double	m_mid_R;
 	double	m_deltaR_over_R;
+	double	m_preDrift_intercept;
 	double	m_preDrift_slope;
+	double	m_postDrift_intercept;
 	double	m_postDrift_slope;
 
 // Overrides

@@ -122,6 +122,8 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, attenuation_coeff(0)
 	, QMON(0)
 	, IMON(0)
+	, Ktpm(0)
+	, Katt(0)
 	, m_run_type(0)
 {
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -1450,10 +1452,12 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 				CRecRunId->m_t_mon_begin = irradiation_begins_now;
 				CRecRunId->m_t_mon_end = irradiation_ends_now;
 			}
-			else if (!electrical_calibration)
+			else if (!electrical_calibration) // Write to database all data related to the monitor chamber acquisition
 			{
 				CRecRunId->m_Delta_VMON = VMend - VMbegin;
-				// CRecRunId->m_QMON = QMON;
+				CRecRunId->m_QMON = QMON;
+				CRecRunId->m_katt = Katt;
+				CRecRunId->m_ktp = Ktpm;
 				CRecRunId->m_P = 0.5 *(PMbegin + PMend);
 				CRecRunId->m_T = 0.5 *(TMbegin + TMend);
 				CRecRunId->m_H = 0.5 *(HMbegin + HMend);
@@ -5217,7 +5221,7 @@ void CminervaRxDlg::OnCbnSelchangeComboRadiationQuality()
 
 void CminervaRxDlg::ElaborateMonitorData() // handles calculation of QMon, Imon, and their corrections
 {
-	double temp, Ktpm, Katt; // Tutte variabili che potrebbero esser rese globali per poterle riutilizzare
+	double temp; // Tutte variabili che potrebbero esser rese globali per poterle riutilizzare
 	CString tempStr;
 	capacitor_value_text.GetWindowTextW(tempStr);
 	capacitor_value_numeric = wcstod(tempStr, NULL);
@@ -5268,7 +5272,7 @@ void CminervaRxDlg::ElaborateMonitorData() // handles calculation of QMon, Imon,
 
 	// correzione per Katt:
 	double dm, LattMTP;
-	dm = 39.95; // distanza del monitor dal fuoco
+	dm = 39.95; // distanza del monitor dal fuoco (al Maggio 2018)
 	LattMTP = (dm / Ktpm) - dm;
 	Katt = exp(attenuation_coeff * 0.0012045 * LattMTP); //densità dell'aria a T=293.15 e P=1013.25 = 0.0012045 g/cm3
 	IMON = IMON*Katt;

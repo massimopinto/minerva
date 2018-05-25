@@ -499,6 +499,7 @@ public:
 	void ElaborateMonitorData();
 	double QMON;
 	double IMON;
+	double Ktpm, Katt;
 	CEdit m_jacket_calibration_seconds_C;
 	CButton m_start_core_injection_C;
 	afx_msg void OnBnClickedChecksynchronize();

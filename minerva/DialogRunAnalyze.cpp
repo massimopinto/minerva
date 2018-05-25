@@ -37,6 +37,9 @@ CDialogRunAnalyze::CDialogRunAnalyze(CWnd* pParent /*=NULL*/, BOOL irradiation, 
 	is_calibration = CRecRunId->m_calibration_mode;
 	power = CRecRunId->m_injected_power;
 	energy = CRecRunId->m_Injected_energy;
+	QMON = CRecRunId->m_QMON;
+	kAtt = CRecRunId->m_katt;
+	kTP = CRecRunId->m_ktp;
 
 	m_vector_run = new (double[vector_size][2]);
 	
@@ -127,10 +130,13 @@ CDialogRunAnalyze::CDialogRunAnalyze(CWnd* pParent /*=NULL*/, BOOL irradiation, 
 	mid_R = 0.5*(R1 + R2);
 	calibration_coefficient = energy / (1000* delta_R / mid_R); 
 
+	// Output of run results to database
 	CRecRunId->Edit();
 	CRecRunId->m_delta_R = delta_R;
 	CRecRunId->m_mid_R = mid_R;
 	CRecRunId->m_deltaR_over_R = (delta_R / mid_R);
+	CRecRunId->m_preDrift_intercept = intercept_preDrift;
+	CRecRunId->m_postDrift_intercept = intercept_postDrift;
 	CRecRunId->m_preDrift_slope = slope_preDrift;
 	CRecRunId->m_postDrift_slope = slope_postDrift;
 	CRecRunId->Update();
@@ -175,7 +181,7 @@ BOOL CDialogRunAnalyze::OnInitDialog()
 	
 	// Prepare text to be displayed below the plot, summaring run information and results
 	
-	CString tmp, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6;
+	CString tmp, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7;
 	tmp.Format(L"%.1f", delta_T);
 	tmp1.Format(L"%.3f", 1000*delta_R);
 	tmp2.Format(L"%.3f", mid_R);
@@ -201,7 +207,13 @@ BOOL CDialogRunAnalyze::OnInitDialog()
 	else if (!is_calibration)
 	{
 		tmp3 = "irradiation";
-
+		double normalised_deltaR_R = (delta_R / mid_R) / QMON;
+		tmp4.Format(L"%.2f", QMON);
+		tmp5.Format(L"%.4f", kAtt);
+		tmp6.Format(L"%.4f", kTP);
+		tmp7.Format(L"%.2f", normalised_deltaR_R);
+		m_run_info.SetWindowTextW(L"Run ID: " + tmp + L"\nDate: " + (CString)date + L"\nHour: " + tmp2 + L"\n\nHeating mode: " + tmp3 +
+			L"\nQMON: " + tmp4 + L" C\nKAtt: " + tmp5 + L"\nKTP: " +tmp6+ L"\n\n(deltaR/R / QMON): " + tmp7 + L" (Ohm/Ohm) / C");
 	}
 		
 
