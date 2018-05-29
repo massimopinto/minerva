@@ -66,6 +66,7 @@ CminervaRxDlg::CminervaRxDlg(CWnd* pParent /*=NULL*/)
 	, m_aux_text(_T(""))
 	, m_pause_start(0)
 	, m_set_point(0)
+	, old_set_point(0)
 	, m_p_pid(0)
 	, m_d_PID(0)
 	, m_core_current(0)
@@ -258,6 +259,8 @@ void CminervaRxDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT25, m_jacket_current_calibration_C);
 	DDX_Control(pDX, IDC_STATIC_Countdown_phase, m_Countdown_show_phase);
 	DDX_Control(pDX, IDC_COMBO_RANGE_K617, m_combo_range_k617);
+	DDX_Control(pDX, IDC_BUTTON_PROBE_CURR_SET, m_button_probe_current);
+	DDX_Control(pDX, IDC_EDIT_PROBE_CURRENT, m_core_probe_curr_C);
 }
 
 BEGIN_MESSAGE_MAP(CminervaRxDlg, CDialogEx)
@@ -427,7 +430,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 		 m_vector_aux[k][1] = 0.0;
 	 }
 	 
-	 
+	 m_flag_jacket = 0; // 
 	 m_points_vector_thermo = 0;
 	 m_points_vector_core = 0;
 	 m_points_vector_aux = 0;
@@ -457,7 +460,7 @@ BOOL CminervaRxDlg::OnInitDialog()
 	 m_combo_thermo_aux_C.AddString(L"T_water");
 	 m_combo_thermo_aux_C.AddString(L"T_PMMA");
 	
-	 m_combo_thermo_aux_C.SetCurSel(2);
+	 m_combo_thermo_aux_C.SetCurSel(2); // The Jacket_2_base is the default themistor on the aux plot
 	 OnCbnSelchangeCombo1();
 
 	 populate_capacitor_list();
@@ -906,14 +909,14 @@ int CminervaRxDlg::conv_CS_CH(CString text)
 }
 
 
-bool CminervaRxDlg::current_inject_k2400(int microampere, long address)
+bool CminervaRxDlg::current_inject_k2400(int microampere, long address) // Integer argument is in microampere
 {
 	CString text;
 
-	text.Format(L"SOUR:CURR:RANG  %g ", microampere / 1000000.);
+	text.Format(L"SOUR:CURR:RANG  %g ", (double) microampere / 1000000.);
 	write_GPIB(address, text);
 	
-	text.Format(L"SOUR:CURR:LEV %g", microampere / 1000000.);
+	text.Format(L"SOUR:CURR:LEV %g", (double) microampere / 1000000.);
 	write_GPIB(address, text);
 	return 1;
 	
@@ -921,7 +924,7 @@ bool CminervaRxDlg::current_inject_k2400(int microampere, long address)
 	
 }
 
-bool CminervaRxDlg::current_inject_k2400(double ampere, long address)
+bool CminervaRxDlg::current_inject_k2400(double ampere, long address) // double argument is in ampere
 {
 	CString text;
 
@@ -1140,8 +1143,9 @@ void CminervaRxDlg::K6220_configuration(int address)
 	text = L"SOUR:CURR:RANG 10e-6"; /* Selects the XX.XXX range on the 6220. */
 	write_GPIB(address, text);
 
-	text.Format(L"CURR  %6.3g", 15. / 1000000.);
+	text.Format(L"CURR  %6.3g", 15. / 1000000.); // 15 uA as probe current for all Wheatstone bridges.
 	write_GPIB(address, text);
+	
 
 	if (address == m_adr_k6220_core)
 	{
@@ -1672,7 +1676,7 @@ void CminervaRxDlg::OnBnClickedButtonstartjacket()
 		m_flag_jacket = 1;
 		//crea_file_ciclo();
 
-		//controllo_potenza_core();
+		
 		k_2400_onoff(0, m_adr_k2400_jacket);
 		current_inject_k2400(m_jacket_current_calibration, m_adr_k2400_jacket);
 
@@ -1887,9 +1891,10 @@ void CminervaRxDlg::OnBnClickedButtonStartCoreMeasurement()
 	//k6220_set_current(m_core_probe_curr, m_adr_k6220_core);
 	//k6220_onoff(TRUE, m_adr_k6220_core);
 		
-	// configurazione del Delta
+	// configurazione del Delta Mode sul ponte di Wheatstone del Core
 	K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr, TRUE);
-
+	m_core_probe_curr_C.EnableWindow(FALSE);
+	m_button_probe_current.EnableWindow(FALSE);
 	//avvio del triggering del Delta Mode
 	
 	/*Verifica che il 2182A sia in external trigger mode*/
@@ -1970,6 +1975,9 @@ void CminervaRxDlg::OnBnClickedButtonStopCoreMeasurement2()
 	// K6220_Delta_Configuration(m_adr_k6220_core, m_core_probe_curr, FALSE);
 	KillTimer(2001);
 	KillTimer(2002);
+
+	m_button_probe_current.EnableWindow(TRUE);
+	m_core_probe_curr_C.EnableWindow(TRUE);
 	m_file_core.Close();
 
 	for (int i = 0; i < DIM_VET_CORE; i++) // Ripulisco il vettore del core così che al prossimo riavvio dell'acquisizione dati sul core i grafici non si sovrappongano
@@ -2983,40 +2991,35 @@ int CminervaRxDlg::create_core_graph()
 }
 
 
-void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
+void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult) // Changes y-axis scale on the Core sensing thermistor plot
+{
 	/* This function was updated in 2017 to make the Core plot in terms of resistance Vs time. 
 	Scaling is supplied by decades, on the y-axis. 
 	*/
-{
+
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// Adjusts the y-axis scale on the core plot
 	float previous_scale = m_scale_plot_core; /* May be I need this, may be not */
 	
-	/* CString text;
-	text.Format(L" Current core plot scale=%.5f ", m_scale_plot_core);
-	add_message(text);*/
-
 	double R = m_vector_core[m_points_vector_core - 1][1];
 	double time = m_vector_core[m_points_vector_core - 1][0];
 
 	double y_min = m_grafico_core->m_ymin;
 	double y_max = m_grafico_core->m_ymax;
-
 	double delta_y = y_max - y_min;
 
 	if (pNMUpDown->iDelta == 1 && m_scale_plot_core > 0.001) /* Button Down pressed: zoom into the plot */
-		{
+	{
 		m_scale_plot_core /= 10.0;
 		y_max -= 0.45 * delta_y;
 		y_min += 0.45 * delta_y;
-		}
-		
+	}
 	else if (pNMUpDown->iDelta == -1 && m_scale_plot_core < 100.) /* Button Up pressed: zoom out of the plot and increased y-scale */
-		{
+	{
 		m_scale_plot_core *= 10.0;
 		y_max += 4.5 * delta_y; /* Magnifies the canvas by a factor of 10 on the y_scale */
 		y_min -= 4.5 * delta_y;
-		}
+	}
 	else return; /* don't do anything if conditions were not met.*/
 	 
 	double upper_limit = y_min + 0.95*(y_max - y_min); /* Close to the limits of the frame as this was before the button pressed */
@@ -3037,14 +3040,17 @@ void CminervaRxDlg::OnDeltaposSpin2(NMHDR *pNMHDR, LRESULT *pResult)
 		m_grafico_core->plotta_frame();
 		}
 
+	/*	
 	if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
 	{
 		m_grafico_core->CambiaColore(0, 100, 200, 1);
 		m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
 		m_grafico_core->plot_single_point(time + 10, 0, FALSE);
-		m_grafico_core->CambiaColore(0, 100, 0, 2);
 	}
-	m_grafico_core->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1); /* re-freshes the entire vector */
+	*/
+	m_grafico_core->CambiaColore(0, 100, 0, 2);
+	m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1); /* re-freshes the entire vector */
+	
 	*pResult = 0;
 }
 
@@ -3162,18 +3168,21 @@ int CminervaRxDlg::jacket_power()
 		double micro_watt = microwatt(m_jacket_current_calibration, volt, &m_microwatt_jacket_C);
 		if (m_flag_jacket == 2)
 		{
-
 			microjoule(micro_watt, cronometer,old_time,  &m_joule_jacket, &m_joule_jacket_C);
 			old_time = cronometer;
-
 			// write_file_cycle(cronometer, m_joule_core, m_micro_ampere_core, volt, 0, 0, 0);
 		}
 
 		if (seconds >= m_jacket_calibration_seconds)
 		{
-			k_2400_onoff(0, m_adr_k2400_jacket);
+			// Time's up, set the base-level heating to the jacket and kill the heating cycle timer
+			if (m_p_status_switch[2] || m_p_status_switch[3])
+				current_inject_k2400(0.0, m_adr_k2400_jacket);
+			else 
+				current_inject_k2400((double)m_jacket_probe_current*1e-6 / 2.0, m_adr_k2400_jacket);
+
 			KillTimer(4001);
-			m_flag_jacket = 3;
+			m_flag_jacket = 0;
 			// m_file_cycle.Close();
 			m_button_start_cycles_C.EnableWindow(TRUE);
 			m_start_jacket_injection_C.EnableWindow(TRUE);
@@ -3399,19 +3408,19 @@ void CminervaRxDlg::OnBnClickedButtonStartAuxMeasurement()
 {
 	UpdateData(TRUE);
 	k6220_onoff(TRUE, m_adr_k6220_multi);
+	k_2400_onoff(1, m_adr_k2400_jacket); // turn the jacket heater on.
 	m_combo_thermo_aux_C.EnableWindow(FALSE);
 	m_aux_start_button_C.EnableWindow(FALSE); // Disables the button to prevent pressing again
 	m_aux_stop_button_C.EnableWindow(TRUE); // Enables the STOP button
 	m_Okay_button_C.EnableWindow(FALSE);
 	
-	// openclose_switch(m_thermo_CH_aux,TRUE);
+	// Openclose_switch(m_thermo_CH_aux,TRUE);
 	m_p_CDC_AUX = m_aux_color_C.GetDC();
 	m_status_aux = INIT;
 	manage_aux(); // Manages the measurement of the auxiliary thermistor, as defined by m_thermo_CH_aux
-	create_file_aux(); // this creates the auxiliary output file where time, resistance, STD, and trend are stored.
+	create_file_aux(); // This creates the auxiliary output file where time, resistance, STD, and trend are stored.
 	crea_aux_graph();
 }
-
 
 void CminervaRxDlg::OnCbnSelchangeCombo1()
 {
@@ -3438,7 +3447,7 @@ void CminervaRxDlg::OnBnClickedButtonStopAuxMeasurement()
 		m_vector_aux[i][1] = 0;
 	}
 
-	
+	k_2400_onoff(0, m_adr_k2400_jacket); 
 	openclose_switch(m_thermo_CH_aux, FALSE);
 	m_combo_thermo_aux_C.EnableWindow(TRUE);
 	m_aux_start_button_C.EnableWindow(TRUE); // Re-enables the start button 
@@ -3477,20 +3486,63 @@ int CminervaRxDlg::crea_aux_graph()
 }
 
 
-void CminervaRxDlg::OnDeltaposSpinAux(NMHDR *pNMHDR, LRESULT *pResult)
+void CminervaRxDlg::OnDeltaposSpinAux(NMHDR *pNMHDR, LRESULT *pResult) // Changes y-axis scale on the auxiliary thermistor plot
 {
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// TODO: Add your control notification handler code here
-	int old_scale = m_scale_plot_aux;
-	if (pNMUpDown->iDelta == 1 && m_scale_plot_aux>1)
+	float old_scale = m_scale_plot_aux;
+
+	double R = m_vector_aux[m_points_vector_aux - 1][1];
+	double time = m_vector_aux[m_points_vector_aux - 1][0];
+
+	double y_min = m_grafico_aux->m_ymin;
+	double y_max = m_grafico_aux->m_ymax;
+	double delta_y = y_max - y_min;
+
+
+	if (pNMUpDown->iDelta == 1 && m_scale_plot_aux > 0.001) /* Button Down pressed: zoom into the plot */
 	{
-		m_scale_plot_aux /= 10;
+		m_scale_plot_aux /= 10.0;
+		y_max -= 0.45 * delta_y;
+		y_min += 0.45 * delta_y;
 	}
-	else if (pNMUpDown->iDelta == -1 && m_scale_plot_aux<10000)
+
+	else if (pNMUpDown->iDelta == -1 && m_scale_plot_aux < 100.) /* Button Up pressed: zoom out of the plot and increased y-scale */
 	{
-		m_scale_plot_aux *= 10;
+		m_scale_plot_aux *= 10.0;
+		y_max += 4.5 * delta_y; /* Magnifies the canvas by a factor of 10 on the y_scale */
+		y_min -= 4.5 * delta_y;
 	}
-	if (m_points_vector_aux>2)
+	else return; /* don't do anything if conditions were not met.*/
+
+	double upper_limit = y_min + 0.95*(y_max - y_min); /* Close to the limits of the frame as this was before the button pressed */
+	double lower_limit = y_min + 0.05*(y_max - y_min);
+
+	if (m_points_vector_aux > 2)
+	{
+		if ((R + 2.5 * m_scale_plot_aux >= upper_limit) || (R - 2.5 * m_scale_plot_aux <= lower_limit)) /* Test condition is with the NEW m_scale_plot_core value */
+		{
+			y_min = R - 2.5 * m_scale_plot_aux;
+			y_max = R + 2.5 * m_scale_plot_aux;
+		}
+
+		m_grafico_aux->coordinate(time - 3589, time + 11, y_min, y_max);
+		m_grafico_aux->x_tick_change(600);
+		m_grafico_aux->y_tick_change((y_max - y_min) / 5.); // nuova larghezza dell'unità sulle ordinate del grafico
+		m_grafico_aux->plotta_frame();
+	}
+
+	/* if (m_grafico_aux->punto_plottabile(time - 3588, 0) && m_grafico_aux->punto_plottabile(time + 10, 0))
+	{
+		m_grafico_aux->CambiaColore(0, 100, 200, 1);
+		m_grafico_aux->plot_single_point(time - 3588, 0, TRUE);
+		m_grafico_aux->plot_single_point(time + 10, 0, FALSE);
+	}
+	*/
+	m_grafico_aux->CambiaColore(0, 100, 0, 2);
+	m_grafico_aux->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1); /* re-freshes the entire vector */
+
+	/* if (m_points_vector_aux>2)
 	{
 		double x_min = m_grafico_aux->m_xmin;
 		double x_max = m_grafico_aux->m_xmax;
@@ -3514,7 +3566,7 @@ void CminervaRxDlg::OnDeltaposSpinAux(NMHDR *pNMHDR, LRESULT *pResult)
 		}
 		m_grafico_aux->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1);
 	}
-
+	*/
 
 	*pResult = 0;
 
@@ -3654,14 +3706,15 @@ int CminervaRxDlg::plot_aux(double time, double R)
 	m_grafico_aux->y_tick_change((y_max - y_min) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
 	m_grafico_aux->plotta_frame();
 
+	/*
 	if (m_grafico_aux->punto_plottabile(time - 3588, 0) && m_grafico_aux->punto_plottabile(time + 10, 0))
 	{
 		m_grafico_aux->CambiaColore(0, 100, 200, 1);
 		m_grafico_aux->plot_single_point(time - 3588, 0, TRUE);
 		m_grafico_aux->plot_single_point(time + 10, 0, FALSE);
-		m_grafico_aux->CambiaColore(0, 0, 200, 2);
 	}
-
+	*/
+	m_grafico_aux->CambiaColore(0, 0, 200, 2);
 	m_grafico_aux->plot_vettore(m_vector_aux, 0, m_points_vector_aux - 1); /* re-plot the entire vector */
 
 	return 1;
@@ -3729,14 +3782,13 @@ int CminervaRxDlg::plot_core(double time, double resistance)
 		/* m_grafico_core->y_tick_change((2. / scala) / 5.); */
 		m_grafico_core->y_tick_change(((y_max - y_min)) / 5.); // Divides the vertical space in 5 blocks (plots four grid lines) 
 		m_grafico_core->plotta_frame();
-		if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
-		{
-			m_grafico_core->CambiaColore(0, 100, 200, 1);
-			m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
-			m_grafico_core->plot_single_point(time + 10, 0, FALSE);
-			m_grafico_core->CambiaColore(0, 0, 200, 2);
-		}
-
+		//if (m_grafico_core->punto_plottabile(time - 3588, 0) && m_grafico_core->punto_plottabile(time + 10, 0))
+		//{
+		//	m_grafico_core->CambiaColore(0, 100, 200, 1);
+		//	m_grafico_core->plot_single_point(time - 3588, 0, TRUE);
+		//	m_grafico_core->plot_single_point(time + 10, 0, FALSE);
+		//}
+		m_grafico_core->CambiaColore(0, 0, 200, 2);
 		m_grafico_core->plot_vettore(m_vector_core, 0, m_points_vector_core - 1);
 	}
 	return 1;
@@ -3746,6 +3798,8 @@ int CminervaRxDlg::plot_core(double time, double resistance)
 // Drives the reading of one auxiliary thermistor via the 7001 switch
 BOOL CminervaRxDlg::manage_aux()
 {
+	int switch_position = m_combo_thermo_aux_C.GetCurSel();
+
 	if (m_status_aux == INIT)
 	{
 		m_ledred_therm_aux_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON2));
@@ -3773,6 +3827,7 @@ BOOL CminervaRxDlg::manage_aux()
 		openclose_switch(m_thermo_CH_aux, TRUE);
 		Status_7001();
 		KillTimer(5000);
+	
 		request_data_multi();
 		m_ledred_therm_aux_C.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON2));
 		m_ledred_therm_aux_C.ShowWindow(SW_SHOW);
@@ -3784,6 +3839,22 @@ BOOL CminervaRxDlg::manage_aux()
 	}
 	else if (m_status_aux == WAITING)
 	{
+		// Handles additional heating on the JACKET body, when any of the two jacket thermistors is on or off the service Wheatstone Bridge
+		//if (switch_position == 2 || switch_position == 3)
+		if (m_p_status_switch[2] || m_p_status_switch[3]) // Handles the case when the Wheatstone bridge is on either one of the Jacket sensing thermistors
+		{
+			if (m_flag_jacket == 0) // Case 1: Jacket Heating thermistors OFF (no electrical calibration active, neither manual heating, see core_power())
+				// this is the case when the jacket body is being heated solely by the sensing thermistor probe current
+				// no additional, compensating power is requested
+			{
+			current_inject_k2400(0.0, m_adr_k2400_jacket);
+			k_2400_read_volt(m_adr_k2400_jacket);
+			}
+			else if (m_flag_jacket == 2) // Case 2: Jacket Heating Thermistors ON
+				current_inject_k2400(m_jacket_current_calibration, m_adr_k2400_jacket); 
+		}
+		
+
 		double resistance = read_aux();
 		if (resistance!=0)
 		{
@@ -3821,22 +3892,32 @@ BOOL CminervaRxDlg::manage_aux()
 				m_aux_speed_C.SetWindowText(m_aux_text);
 				thermo(- speed, m_p_CDC_AUX); 
 
-				//if (old_time > 0)
-				//{
-				//	speed = 60/*000*/ * (delta_t - old_delta_t) / (seconds - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
-				//	m_aux_text.Format(L"%6.3g ", speed);
-					//termo(speed, p_termo);
-				//	m_aux_speed_C.SetWindowText(m_aux_text);
-				//	thermo(speed, m_p_CDC_AUX);
-				// }
+				
 				m_aux_text.Format(L"%9.9f", m_mean_resistance_aux);
 				m_aux_ohm_C.SetWindowTextW(m_aux_text);
-				//old_time = seconds;
-				// old_delta_t = delta_t;
-
+				
 				save_aux(seconds, m_mean_resistance_aux, 0, speed); 
 								
 				m_status_aux = START;
+
+				
+				//if (switch_position == 2 || switch_position == 3)
+				if (m_p_status_switch[2] || m_p_status_switch[3])
+				{
+					if (m_flag_jacket == 0)
+					{	// Jacket Heating thermistors OFF: must supply an equal heating power to the jacket until next sensor reading
+						// You can approximate this by injecting the same probe current as in the sensing thermistor, but divided by 2.8 (sqrt(8)) because there are two
+						// heating thermistors in the jacket and because approximately 1/2 of the porbe current sent to an almost balanced bridge goes to the thermistor's arm.
+						current_inject_k2400((double)m_jacket_probe_current*1e-6 / 2.8, m_adr_k2400_jacket);
+						k_2400_read_volt(m_adr_k2400_jacket);
+					}
+					else if (m_flag_jacket == 2) // Jacket Heating Thermistors ON (calibration or manual heating) but null heating from the Wheatstone bridge
+					{
+						double compensated_calibration_current = (double) m_jacket_current_calibration * 1e-6 + (double) m_jacket_probe_current*1e-6 / 2.8;
+						current_inject_k2400(compensated_calibration_current, m_adr_k2400_jacket);
+					}
+				}
+				
 				switch_open_all();
 				Status_7001();
 				SetTimer(5000, m_aux_reading_interval * 1000, NULL); 
@@ -4158,6 +4239,7 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 	static double  integrator = 0.;
 	static double mean_resistance = 0;
 	CString aux_text;
+	
 	if (m_status_thermostat == INIT)
 	{
 		ctr = 0;
@@ -4190,21 +4272,27 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 			static long old_time = 0;
 			static double thermospeed = .1;
 			long time = clock();
-			// double error = m_set_point - resistance;
-			// double delta_T = (((m_set_point - resistance) / fabs(m_set_point)) / 0.04);
+			double set_point_shift = 0.0;
+			if (old_set_point != m_set_point) // Handling of a new set point, typically warmer, therefore a negative set point shift.
+			{
+				set_point_shift = m_set_point - old_set_point; 
+			}
+
 			double delta_R = m_set_point - mean_resistance /*resistance*/;
 			m_aux_text.Format(L"%g", delta_R);
 			m_delta_k_C.SetWindowText(m_aux_text);
+
 			if (m_old_thermo_resistance) // Calcolo della velocità istantanea (ultime due misure)
 			{ 
 				// thermospeed = 60000 * (delta_T - m_old_thermo_temperature) / (time - old_time); // 60000: convertion factor from milliseconds to minutes. Speed is given in Kelvin / minute
-				thermospeed = 60000 * (delta_R - m_old_thermo_resistance) / (time - old_time); /* thermostat speed in delta_R /min */
+				thermospeed = -60000 * (mean_resistance - m_old_thermo_resistance) / (time - old_time);
+				// thermospeed = 60000 * (delta_R - m_old_thermo_resistance) / (time - old_time); /* thermostat speed in delta_R /min */
 				m_aux_text.Format(L"%6.3g ", thermospeed);
-				//termo(speed, p_termo);
 				m_speed_shield_C.SetWindowText(m_aux_text);
 				thermo(thermospeed, m_p_CDC);
 			}
-			m_old_thermo_resistance = /*delta_T*/ delta_R; 
+			//m_old_thermo_resistance = delta_R; 
+			m_old_thermo_resistance = mean_resistance;
 	
 			m_aux_text.Format(L"%6.5g", m_power_thermostat); // occhio che power deve essere aggiornato anche da PID, se questo viene chiamato;
 			m_microW_shield_C.SetWindowTextW(m_aux_text);
@@ -4212,7 +4300,7 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 			// August 6, 2014
 			// Massimo is making changes here: first one updates the vector with the delta_T and times, then calculates integral and derived quantities to be passed over to PID();
 
-			Write_To_File_Thermostat_Shield(m_set_point, resistance, delta_R, m_power_thermostat, thermospeed); // Handles the thermostat log file
+			Write_To_File_Thermostat_Shield(m_set_point, mean_resistance, delta_R, m_power_thermostat, thermospeed); // Handles the thermostat log file
 			plot_thermostat(m_seconds_continuous_thermostat, delta_R); // Handles the thermostat plot, adding the current point to the graph.
 			// plot_thermostat(m_seconds_continuous_thermostat, error, true); // Handles the thermostat plot, adding the current point to the graph.
 			manage_thermo_deltaR_vector(delta_R, m_seconds_continuous_thermostat);  // Copies current delta_R and time inside the deltaR_vector;
@@ -4240,6 +4328,7 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 			discharge = 0;
 			ctr = 0;
 			integrator = 0;
+			old_set_point = m_set_point;
 			return 1;
 		}
 	}
@@ -4251,11 +4340,11 @@ BOOL CminervaRxDlg::Manage_Thermostat_Mean(double resistance)
 int CminervaRxDlg::PID(double resistance, double delta_T, double speed)
 {
 	
-	//// PARAMETERS FOR PID DERIVATIVE
+	// PARAMETERS FOR PID DERIVATIVE
 	double spec_heat = .72; /// specific heat this should be a PARAMETER (J/K g-1)
 	double weight = 15.0; /// this could be a input variable (g)
-	double ETA_target = m_ETA_target;  /// this should be a input vatiable (min)
-	////// END PARAMETER
+	double ETA_target = m_ETA_target;  // this should be a input vatiable (min)
+	// END PARAMETER
 
 	long old_time = m_old_time;
 	m_old_thermo_temperature = delta_T;
@@ -4772,8 +4861,9 @@ void CminervaRxDlg::K6220_Delta_Configuration(int address, double microampere, b
 	CString text, text1;
 	if (action == TRUE)
 		{
-		text1.Format(L"%.1g", microampere / 1000000);
+		text1.Format(L"%6.3g", microampere / 1000000.0);
 		text = L"SOURce:DELTa:HIGH ";
+		// text = L"SOURce:DELTa:LOW ";
 		text += text1;
 		write_GPIB(address, text);
 

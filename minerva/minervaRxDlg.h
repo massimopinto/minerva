@@ -42,7 +42,7 @@
 #define RESISTENZA_PONTE_WHEATSTONE 10000 // Resistenza Ponte Wheatstone
 #define SECONDI_SCARTO 20 // Secondi da scartare nella regressione lineare testa-coda ???
 #define DIM_VET_TERMO 1000 // Dimensione vettore dati thermostato
-#define DIM_VET_CORE 4000 // Vector data size. Since TIMER_CORE is set to 500, for the graph to show the entire past one hour you should set this size to at least (3600" / 0.57"), that is 6315 positions.
+#define DIM_VET_CORE 6400 // Vector data size. Since TIMER_CORE is set to 500 ms, for the graph to show the entire past one hour you should set this size to at least (3600" / 0.57"), that is 6315 positions.
 #define DIM_VET_AUX 4000 // Dimensione vettore dati AUX
 #define P_IN 1.00088197 // Parameters for the calculation of the monitor chambers' kSat (Pin, Pvol)
 #define P_VOL 9854.7
@@ -169,6 +169,7 @@ public:
 	// checks whether pasue time has been reached before a new cycle is launched
 	BOOL control_pause();
 	double m_set_point;
+	double old_set_point;
 	double m_p_pid;
 	double m_d_PID;
 	CEdit m_shield_ohm_C;
@@ -518,4 +519,6 @@ public:
 	Crun_id* CRecRunId;
 	Crun_measurements* CRecRunMeas;
 	afx_msg void OnBnClickedButtonStopCoreCurrentInjection();
+	CButton m_button_probe_current;
+	CEdit m_core_probe_curr_C;
 };
