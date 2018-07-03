@@ -1251,6 +1251,8 @@ void CminervaRxDlg::OnBnClickedStartCoreInjection()
 		m_run_type = 1;
 		m_Combo_CoreHeatingMode.EnableWindow(FALSE);
 		m_Combo_Electrical_Calibration_Time.EnableWindow(FALSE);
+		// m_start_jacket_injection_C.EnableWindow(FALSE);
+
 		CRecRunId->Open();
 		CRecRunId->AddNew();
 		CRecRunId->m_calibration_mode = 1;
@@ -1412,25 +1414,8 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			UpdateData(FALSE);
 			m_Countdown_show_phase.SetWindowTextW(L"Post-Run Drift");
 			m_Countdown_show_phase.ShowWindow(SW_SHOW);
-			if (m_run_countdown == 60) // Two minutes (180" - 120") after heating bring back a series of controls so that you can repeat a run
-			{
-				// re-enabling all buttons linked to irradiations, if the GPIB is extended
-				if (!m_partial_GPIB_configuration)
-				{
-					m_button_irradiate.EnableWindow(TRUE);
-					m_Combo_Irradiation_Time.EnableWindow(TRUE);
-					m_combo_radiation_quality.EnableWindow(TRUE);
-					m_combo_range_k617.EnableWindow(TRUE);
-					capacitor_number.EnableWindow(TRUE);
-					capacitor_value_text.EnableWindow(TRUE);
-				}
-				
-				// re-enabling all controls for Calibrations (Mode and Time Combos, Start and Stop buttons )
-				m_Combo_CoreHeatingMode.EnableWindow(TRUE);
-				m_Combo_Electrical_Calibration_Time.EnableWindow(TRUE);
-				m_Stop_Core_current_injection_C.EnableWindow(FALSE); 
-				m_start_core_injection_C.EnableWindow(TRUE);
-			}
+			// if (m_run_countdown == 60) // Two minutes (180" - 120") after heating bring back a series of controls so that you can repeat a run
+			
 		}
 		else
 		{
@@ -1485,9 +1470,28 @@ void CminervaRxDlg::OnTimer(UINT_PTR nIDEvent)
 			// closing the recordsets related to the ID of the current RUN and associated set of time/resistance measures.
 			if (CRecRunId->IsOpen()) CRecRunId->Close();
 			if (CRecRunMeas->IsOpen()) CRecRunMeas->Close();
+			
+			
+			// re-enabling all buttons linked to irradiations, if the GPIB is extended
+			if (!m_partial_GPIB_configuration)
+			{
+				m_button_irradiate.EnableWindow(TRUE);
+				m_Combo_Irradiation_Time.EnableWindow(TRUE);
+				m_combo_radiation_quality.EnableWindow(TRUE);
+				m_combo_range_k617.EnableWindow(TRUE);
+				capacitor_number.EnableWindow(TRUE);
+				capacitor_value_text.EnableWindow(TRUE);
+			}
+			// re-enabling all controls for Calibrations (Mode and Time Combos, Start and Stop buttons for both Core and Jacket current injections)
+			m_Combo_CoreHeatingMode.EnableWindow(TRUE);
+			m_Combo_Electrical_Calibration_Time.EnableWindow(TRUE);
+			m_Stop_Core_current_injection_C.EnableWindow(FALSE);
+			m_Stop_Jacket_current_injection_C.EnableWindow(FALSE);
+			m_start_core_injection_C.EnableWindow(TRUE);
+			m_start_jacket_injection_C.EnableWindow(TRUE);
+			}
 		}
-	}
-
+	
 	CDialogEx::OnTimer(nIDEvent);
 }
 
@@ -1658,11 +1662,11 @@ void CminervaRxDlg::OnBnClickedButtonstartjacket()
 		m_jacket_calibration_seconds = (int) wcstod(current, NULL);
 		UpdateData(FALSE);
 	}
-	else
-	{
+	// else // prova del 3 Luglio 2018
+	//{
 		m_start_jacket_injection_C.EnableWindow(FALSE);
 		m_Stop_Jacket_current_injection_C.EnableWindow(TRUE);
-	}
+	//}
 		// UpdateData(TRUE);
 		
 		if (m_jacket_calibration_seconds <= 0 || m_jacket_current_calibration <= 0 || m_jacket_current_calibration >500 || m_jacket_calibration_seconds >15000)
@@ -3185,8 +3189,12 @@ int CminervaRxDlg::jacket_power()
 			m_flag_jacket = 0;
 			// m_file_cycle.Close();
 			m_button_start_cycles_C.EnableWindow(TRUE);
-			m_start_jacket_injection_C.EnableWindow(TRUE);
-			m_Stop_Jacket_current_injection_C.EnableWindow(FALSE);
+			if (m_CoreHeatingMode != 1)
+			{
+				m_start_jacket_injection_C.EnableWindow(TRUE);
+				m_Stop_Jacket_current_injection_C.EnableWindow(FALSE);
+			}
+		
 		}
 	return 0;
 }
